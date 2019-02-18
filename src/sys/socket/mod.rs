@@ -700,6 +700,34 @@ pub enum ControlMessage<'a> {
     // and put that in here instead of a raw ucred.
     #[cfg(any(target_os = "android", target_os = "linux"))]
     ScmCredentials(&'a libc::ucred),
+
+    /// Set IV for `AF_ALG` crypto API.
+    /// For further information, please refer to the
+    /// [`documentation`](https://kernel.readthedocs.io/en/sphinx-samples/crypto-API.html)
+    #[cfg(any(
+        target_os = "android",
+        target_os = "linux",
+    ))]
+    AlgSetIv(&'a libc::af_alg_iv),
+    #[cfg(any(
+        target_os = "android",
+        target_os = "linux",
+    ))]
+    /// Set crypto operation for `AF_ALG` crypto API. It may be one of
+    /// `ALG_OP_ENCRYPT` or `ALG_OP_DECRYPT`
+    /// For further information, please refer to the
+    /// [`documentation`](https://kernel.readthedocs.io/en/sphinx-samples/crypto-API.html)
+    AlgSetOp(&'a c_int),
+    #[cfg(any(
+        target_os = "android",
+        target_os = "linux",
+    ))]
+    /// Set the length of associated authentication data (AAD) (applicable only to AEAD algoritms)
+    /// for `AF_ALG` crypto API.
+    /// For further information, please refer to the
+    /// [`documentation`](https://kernel.readthedocs.io/en/sphinx-samples/crypto-API.html)
+    AlgSetAeadAssoclen(&'a c_int),
+
 }
 
 // An opaque structure used to prevent cmsghdr from being a public type
@@ -738,6 +766,18 @@ impl<'a> ControlMessage<'a> {
             &ControlMessage::ScmCredentials(creds) => {
                 creds as *const libc::ucred as *const u8
             }
+            #[cfg(any(target_os = "android", target_os = "linux"))]
+            &ControlMessage::AlgSetIv(iv) => {
+                iv as *const _ as *const u8
+            },
+            #[cfg(any(target_os = "android", target_os = "linux"))]
+            &ControlMessage::AlgSetOp(op) => {
+                op as *const _ as *const u8
+            },
+            #[cfg(any(target_os = "android", target_os = "linux"))]
+            &ControlMessage::AlgSetAeadAssoclen(len) => {
+                len as *const _ as *const u8
+            },
         }
     }
 
@@ -751,6 +791,18 @@ impl<'a> ControlMessage<'a> {
             &ControlMessage::ScmCredentials(creds) => {
                 mem::size_of_val(creds)
             }
+            #[cfg(any(target_os = "android", target_os = "linux"))]
+            &ControlMessage::AlgSetIv(iv) => {
+                mem::size_of::<c_int>() + iv.ivlen as usize
+            },
+            #[cfg(any(target_os = "android", target_os = "linux"))]
+            &ControlMessage::AlgSetOp(op) => {
+                mem::size_of_val(op)
+            },
+            #[cfg(any(target_os = "android", target_os = "linux"))]
+            &ControlMessage::AlgSetAeadAssoclen(len) => {
+                mem::size_of_val(len)
+            },
         }
     }
 
@@ -760,6 +812,10 @@ impl<'a> ControlMessage<'a> {
             &ControlMessage::ScmRights(_) => libc::SOL_SOCKET,
             #[cfg(any(target_os = "android", target_os = "linux"))]
             &ControlMessage::ScmCredentials(_) => libc::SOL_SOCKET,
+            #[cfg(any(target_os = "android", target_os = "linux"))]
+            &ControlMessage::AlgSetIv(_) | &ControlMessage::AlgSetOp(_) | &ControlMessage::AlgSetAeadAssoclen(_) => {
+                libc::SOL_ALG
+            },
         }
     }
 
@@ -769,6 +825,18 @@ impl<'a> ControlMessage<'a> {
             &ControlMessage::ScmRights(_) => libc::SCM_RIGHTS,
             #[cfg(any(target_os = "android", target_os = "linux"))]
             &ControlMessage::ScmCredentials(_) => libc::SCM_CREDENTIALS,
+            #[cfg(any(target_os = "android", target_os = "linux"))]
+            &ControlMessage::AlgSetIv(_) => {
+                libc::ALG_SET_IV
+            },
+            #[cfg(any(target_os = "android", target_os = "linux"))]
+            &ControlMessage::AlgSetOp(_) => {
+                libc::ALG_SET_OP
+            },
+            #[cfg(any(target_os = "android", target_os = "linux"))]
+            &ControlMessage::AlgSetAeadAssoclen(_) => {
+                libc::ALG_SET_AEAD_ASSOCLEN
+            },
         }
     }
 
