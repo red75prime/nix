@@ -46,6 +46,7 @@ pub use libc::{
 // Needed by the cmsg_space macro
 #[doc(hidden)]
 pub use libc::{c_uint, CMSG_SPACE};
+use sys::socket::addr::alg::AlgAddr;
 
 /// These constants are used to specify the communication semantics
 /// when creating a socket with [`socket()`](fn.socket.html)
@@ -1169,6 +1170,8 @@ pub enum SockLevel {
     Udp = libc::IPPROTO_UDP,
     #[cfg(any(target_os = "android", target_os = "linux"))]
     Netlink = libc::SOL_NETLINK,
+    #[cfg(any(target_os = "android", target_os = "linux"))]
+    Alg = libc::SOL_ALG,
 }
 
 /// Represents a socket option that can be accessed or set. Used as an argument
@@ -1282,6 +1285,11 @@ pub unsafe fn sockaddr_storage_to_addr(
         libc::AF_NETLINK => {
             use libc::sockaddr_nl;
             Ok(SockAddr::Netlink(NetlinkAddr(*(addr as *const _ as *const sockaddr_nl))))
+        }
+        #[cfg(any(target_os = "android", target_os = "linux"))]
+        libc::AF_ALG => {
+            use libc::sockaddr_alg;
+            Ok(SockAddr::Alg(AlgAddr(*(addr as *const _ as *const sockaddr_alg))))
         }
         af => panic!("unexpected address family {}", af),
     }

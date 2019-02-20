@@ -7,7 +7,8 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 ### Added
 - Add IP_RECVIF & IP_RECVDSTADDR. Enable IP_PKTINFO and IP6_PKTINFO on netbsd/openbsd.
   ([#1002](https://github.com/nix-rust/nix/pull/1002))
-- Add `ALG_SET_IV`, `ALG_SET_OP` and `ALG_SET_AEAD_ASSOCLEN` control messages on Linux and Andorid
+- Add `ALG_SET_IV`, `ALG_SET_OP` and `ALG_SET_AEAD_ASSOCLEN` control messages and `AF_ALG`
+  socket types on Linux and Andorid
   ([#1031](https://github.com/nix-rust/nix/pull/1031))
 ### Changed
 - `PollFd` event flags renamed to `PollFlags` ([#1024](https://github.com/nix-rust/nix/pull/1024/))
