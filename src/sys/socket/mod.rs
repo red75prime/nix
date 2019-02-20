@@ -31,6 +31,8 @@ pub use self::addr::{
 };
 #[cfg(any(target_os = "android", target_os = "linux"))]
 pub use ::sys::socket::addr::netlink::NetlinkAddr;
+#[cfg(any(target_os = "android", target_os = "linux"))]
+pub use sys::socket::addr::alg::AlgAddr;
 
 pub use libc::{
     cmsghdr,
@@ -46,7 +48,6 @@ pub use libc::{
 // Needed by the cmsg_space macro
 #[doc(hidden)]
 pub use libc::{c_uint, CMSG_SPACE};
-use sys::socket::addr::alg::AlgAddr;
 
 /// These constants are used to specify the communication semantics
 /// when creating a socket with [`socket()`](fn.socket.html)
