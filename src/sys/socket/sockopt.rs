@@ -148,8 +148,8 @@ macro_rules! sockopt_impl {
         sockopt_impl!(SetOnly, $name, $level, $flag, usize, SetUsize);
     };
 
-    (SetOnly, $name:ident, $level:path, $flag:path, Vec<u8>) => {
-        sockopt_impl!(SetOnly, $name, $level, $flag, Vec<u8>, SetBytes);
+    (SetOnly, $name:ident, $level:path, $flag:path, [u8]) => {
+        sockopt_impl!(SetOnly, $name, $level, $flag, [u8], SetBytes<[u8]>);
     };
 
     (Both, $name:ident, $level:path, $flag:path, bool) => {
@@ -373,23 +373,24 @@ unsafe impl<T> Get<T> for GetStruct<T> {
 }
 
 /// Setter for bytes.
-struct SetBytes<'a> {
-    ptr: &'a Vec<u8>,
+struct SetBytes<'a, T> where T: AsRef<[u8]> {
+    ptr: &'a T,
 }
 
-unsafe impl<'a> Set<'a, Vec<u8>> for SetBytes<'a> {
-    fn new(ptr: &'a Vec<u8>) -> SetBytes<'a> {
+unsafe impl<'a, T> Set<'a, T> for SetBytes<'a, T> where T: AsRef<[u8]> {
+    fn new(ptr: &'a T) -> SetBytes<'a, T> {
         SetBytes { ptr }
     }
 
     fn ffi_ptr(&self) -> *const c_void {
-        self.ptr.as_slice() as *const _ as *const c_void
+        self.ptr.as_ref() as *const _ as *const c_void
     }
 
     fn ffi_len(&self) -> socklen_t {
-        self.ptr.len() as socklen_t
+        self.ptr.as_ref().len() as socklen_t
     }
 }
+
 /// Setter for an arbitrary `struct`.
 struct SetStruct<'a, T: 'static> {
     ptr: &'a T,

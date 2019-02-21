@@ -201,7 +201,8 @@ pub fn test_af_alg_cmsg() {
     // 256-bits secret key
     let key = vec![0u8; 32];
     // 16-bytes IV
-    let iv = vec![1u8; 16];
+    let iv_len = 16;
+    let iv = vec![1u8; iv_len];
     // 256-bytes plain payload
     let payload_len = 256;
     let payload = vec![2u8; payload_len];
@@ -232,6 +233,9 @@ pub fn test_af_alg_cmsg() {
     assert_eq!(num_bytes, payload_len);
 
     let iov = IoVec::from_slice(&encrypted);
+
+    let iv = vec![1u8; iv_len];
+
     let msgs = [ControlMessage::AlgSetOp(&libc::ALG_OP_DECRYPT), ControlMessage::AlgSetIv(iv.as_slice())];
     sendmsg(session_socket, &[iov], &msgs, MsgFlags::empty(), None).expect("sendmsg decrypt");
 
