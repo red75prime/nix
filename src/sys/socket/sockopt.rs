@@ -373,7 +373,7 @@ unsafe impl<T> Get<T> for GetStruct<T> {
 }
 
 /// Setter for bytes.
-struct SetBytes<'a, T> where T: AsRef<[u8]> {
+struct SetBytes<'a, T> where T: 'a + AsRef<[u8]> {
     ptr: &'a T,
 }
 

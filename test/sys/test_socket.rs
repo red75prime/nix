@@ -189,6 +189,7 @@ pub fn test_scm_rights() {
 #[cfg(any(target_os = "linux", target_os= "android"))]
 #[test]
 pub fn test_af_alg_cmsg() {
+    use libc;
     use nix::sys::uio::IoVec;
     use nix::unistd::read;
     use nix::sys::socket::{socket, sendmsg, bind, accept, setsockopt,
