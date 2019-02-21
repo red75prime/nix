@@ -721,7 +721,7 @@ pub enum ControlMessage<'a> {
         target_os = "android",
         target_os = "linux",
     ))]
-    AlgSetOp(&'a u32),
+    AlgSetOp(&'a libc::c_int),
     /// Set the length of associated authentication data (AAD) (applicable only to AEAD algoritms)
     /// for `AF_ALG` crypto API.
     /// AF_ALG is only supported on linux and android.
