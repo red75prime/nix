@@ -148,10 +148,6 @@ macro_rules! sockopt_impl {
         sockopt_impl!(SetOnly, $name, $level, $flag, usize, SetUsize);
     };
 
-    (SetOnly, $name:ident, $level:path, $flag:path, [u8]) => {
-        sockopt_impl!(SetOnly, $name, $level, $flag, [u8], SetBytes<[u8]>);
-    };
-
     (Both, $name:ident, $level:path, $flag:path, bool) => {
         sockopt_impl!(Both, $name, $level, $flag, bool, GetBool, SetBool);
     };
@@ -223,7 +219,6 @@ cfg_if! {
     if #[cfg(any(target_os = "android", target_os = "linux"))] {
         sockopt_impl!(SetOnly, Ipv6AddMembership, libc::IPPROTO_IPV6, libc::IPV6_ADD_MEMBERSHIP, super::Ipv6MembershipRequest);
         sockopt_impl!(SetOnly, Ipv6DropMembership, libc::IPPROTO_IPV6, libc::IPV6_DROP_MEMBERSHIP, super::Ipv6MembershipRequest);
-        sockopt_impl!(SetOnly, AlgSetKey, libc::SOL_ALG, libc::ALG_SET_KEY, Vec<u8>);
     } else if #[cfg(any(target_os = "dragonfly",
                         target_os = "freebsd",
                         target_os = "ios",
@@ -312,6 +307,55 @@ sockopt_impl!(Both, Ipv4RecvIf, libc::IPPROTO_IP, libc::IP_RECVIF, bool);
 sockopt_impl!(Both, Ipv4RecvDstAddr, libc::IPPROTO_IP, libc::IP_RECVDSTADDR, bool);
 
 
+#[cfg(any(target_os = "android", target_os = "linux"))]
+#[derive(Copy, Clone, Debug)]
+pub struct AlgSetAeadAuthSize;
+
+// ALG_SET_AEAD_AUTH_SIZE read the length from passed `option_len`
+// See https://elixir.bootlin.com/linux/v4.4/source/crypto/af_alg.c#L222
+#[cfg(any(target_os = "android", target_os = "linux"))]
+impl SetSockOpt for AlgSetAeadAuthSize {
+    type Val = usize;
+
+    fn set(&self, fd: RawFd, val: &usize) -> Result<()> {
+        unsafe {
+            let res = libc::setsockopt(fd,
+                                       libc::SOL_ALG,
+                                       libc::ALG_SET_AEAD_AUTHSIZE,
+                                       ::std::ptr::null(),
+                                       *val as libc::socklen_t);
+            Errno::result(res).map(drop)
+        }
+    }
+}
+
+#[cfg(any(target_os = "android", target_os = "linux"))]
+#[derive(Clone, Debug)]
+pub struct AlgSetKey<T>(::std::marker::PhantomData<T>);
+
+#[cfg(any(target_os = "android", target_os = "linux"))]
+impl<T> Default for AlgSetKey<T> {
+    fn default() -> Self {
+        AlgSetKey(Default::default())
+    }
+}
+
+#[cfg(any(target_os = "android", target_os = "linux"))]
+impl<T> SetSockOpt for AlgSetKey<T> where T: AsRef<[u8]> + Clone {
+    type Val = T;
+
+    fn set(&self, fd: RawFd, val: &T) -> Result<()> {
+        unsafe {
+            let res = libc::setsockopt(fd,
+                                       libc::SOL_ALG,
+                                       libc::ALG_SET_KEY,
+                                       val.as_ref().as_ptr() as *const _,
+                                       val.as_ref().len() as libc::socklen_t);
+            Errno::result(res).map(drop)
+        }
+    }
+}
+
 /*
  *
  * ===== Accessor helpers =====
@@ -369,25 +413,6 @@ unsafe impl<T> Get<T> for GetStruct<T> {
     unsafe fn unwrap(self) -> T {
         assert!(self.len as usize == mem::size_of::<T>(), "invalid getsockopt implementation");
         self.val
-    }
-}
-
-/// Setter for bytes.
-struct SetBytes<'a, T> where T: 'a + AsRef<[u8]> {
-    ptr: &'a T,
-}
-
-unsafe impl<'a, T> Set<'a, T> for SetBytes<'a, T> where T: AsRef<[u8]> {
-    fn new(ptr: &'a T) -> SetBytes<'a, T> {
-        SetBytes { ptr }
-    }
-
-    fn ffi_ptr(&self) -> *const c_void {
-        self.ptr.as_ref() as *const _ as *const c_void
-    }
-
-    fn ffi_len(&self) -> socklen_t {
-        self.ptr.as_ref().len() as socklen_t
     }
 }
 

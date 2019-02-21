@@ -721,7 +721,7 @@ pub enum ControlMessage<'a> {
         target_os = "android",
         target_os = "linux",
     ))]
-    AlgSetOp(&'a c_int),
+    AlgSetOp(&'a u32),
     /// Set the length of associated authentication data (AAD) (applicable only to AEAD algoritms)
     /// for `AF_ALG` crypto API.
     /// AF_ALG is only supported on linux and android.
@@ -731,7 +731,7 @@ pub enum ControlMessage<'a> {
         target_os = "android",
         target_os = "linux",
     ))]
-    AlgSetAeadAssoclen(&'a c_int),
+    AlgSetAeadAssoclen(&'a u32),
 
 }
 
@@ -1199,7 +1199,7 @@ pub trait GetSockOpt : Copy {
 
 /// Represents a socket option that can be accessed or set. Used as an argument
 /// to `setsockopt`
-pub trait SetSockOpt : Copy {
+pub trait SetSockOpt : Clone {
     type Val;
 
     #[doc(hidden)]

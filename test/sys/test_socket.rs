@@ -188,7 +188,7 @@ pub fn test_scm_rights() {
 
 #[cfg(any(target_os = "linux", target_os= "android"))]
 #[test]
-pub fn test_af_alg_cmsg() {
+pub fn test_af_alg_cipher() {
     use libc;
     use nix::sys::uio::IoVec;
     use nix::unistd::read;
@@ -221,7 +221,7 @@ pub fn test_af_alg_cmsg() {
         panic!("unexpected SockAddr");
     }
 
-    setsockopt(sock, AlgSetKey, &key).expect("setsockopt");
+    setsockopt(sock, AlgSetKey::default(), &key).expect("setsockopt");
     let session_socket = accept(sock).expect("accept failed");
 
     let msgs = [ControlMessage::AlgSetOp(&libc::ALG_OP_ENCRYPT), ControlMessage::AlgSetIv(iv.as_slice())];
@@ -245,6 +245,76 @@ pub fn test_af_alg_cmsg() {
     let num_bytes = read(session_socket, &mut decrypted).expect("read decrypt");
 
     assert_eq!(num_bytes, payload_len);
+    assert_eq!(decrypted, payload);
+}
+
+#[cfg(any(target_os = "linux", target_os= "android"))]
+#[test]
+pub fn test_af_alg_aead() {
+    use libc;
+    use nix::sys::uio::IoVec;
+    use nix::unistd::read;
+    use nix::sys::socket::{socket, sendmsg, bind, accept, setsockopt,
+                           AddressFamily, SockType, SockFlag, SockAddr,
+                           ControlMessage, MsgFlags};
+    use nix::sys::socket::sockopt::{AlgSetKey, AlgSetAeadAuthSize};
+
+    let auth_size = 4usize;
+    let assoc_size = 16u32;
+
+    let alg_type = "aead";
+    let alg_name = "gcm(aes)";
+    // 256-bits secret key
+    let key = vec![0u8; 32];
+    // 12-bytes IV
+    let iv_len = 12;
+    let iv = vec![1u8; iv_len];
+    // 256-bytes plain payload
+    let payload_len = 256;
+    let mut payload = vec![2u8; payload_len + (assoc_size as usize)];
+
+    for i in 0..assoc_size {
+        payload[i as usize] = 10;
+    }
+
+    let sock = socket(AddressFamily::Alg, SockType::SeqPacket, SockFlag::empty(), None)
+        .expect("socket failed");
+
+    let sockaddr = SockAddr::new_alg(alg_type, alg_name);
+    bind(sock, &sockaddr).expect("bind failed");
+
+    setsockopt(sock, AlgSetKey::default(), &key).expect("setsockopt AlgSetKey");
+    setsockopt(sock, AlgSetAeadAuthSize, &auth_size).expect("setsockopt AlgSetAeadAuthSize");
+    let session_socket = accept(sock).expect("accept failed");
+
+    let msgs = [
+        ControlMessage::AlgSetOp(&libc::ALG_OP_ENCRYPT),
+        ControlMessage::AlgSetIv(iv.as_slice()),
+        ControlMessage::AlgSetAeadAssoclen(&assoc_size)];
+    let iov = IoVec::from_slice(&payload);
+    sendmsg(session_socket, &[iov], &msgs, MsgFlags::empty(), None).expect("sendmsg encrypt");
+
+    // allocate buffer for encrypted data
+    let mut encrypted = vec![0u8; (assoc_size as usize) + payload_len + auth_size];
+    let num_bytes = read(session_socket, &mut encrypted).expect("read encrypt");
+    assert_eq!(num_bytes, payload_len + auth_size + (assoc_size as usize));
+
+    let iov = IoVec::from_slice(&encrypted);
+
+    let iv = vec![1u8; iv_len];
+
+    let msgs = [
+        ControlMessage::AlgSetOp(&libc::ALG_OP_DECRYPT),
+        ControlMessage::AlgSetIv(iv.as_slice()),
+        ControlMessage::AlgSetAeadAssoclen(&assoc_size),
+    ];
+    sendmsg(session_socket, &[iov], &msgs, MsgFlags::empty(), None).expect("sendmsg decrypt");
+
+    // allocate buffer for decrypted data
+    let mut decrypted = vec![0u8; payload_len + (assoc_size as usize)];
+    let num_bytes = read(session_socket, &mut decrypted).expect("read decrypt");
+
+    assert_eq!(num_bytes, payload_len + (assoc_size as usize));
     assert_eq!(decrypted, payload);
 }
 
