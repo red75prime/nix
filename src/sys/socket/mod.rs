@@ -761,11 +761,9 @@ impl<'a> ControlMessage<'a> {
         unsafe{CMSG_LEN(self.len() as libc::c_uint)}
     }
 
-
-
     /// Return a reference to the payload data as a byte pointer
-    fn write_data(&self, cmsg_data: *mut u8) {
-        let write_data_ptr = match self {
+    fn copy_to_cmsg_data(&self, cmsg_data: *mut u8) {
+        let data_ptr = match self {
             &ControlMessage::ScmRights(fds) => {
                 fds as *const _ as *const u8
             },
@@ -776,7 +774,7 @@ impl<'a> ControlMessage<'a> {
             #[cfg(any(target_os = "android", target_os = "linux"))]
             &ControlMessage::AlgSetIv(iv) => {
                 unsafe {
-                    let alg_iv: *mut libc::af_alg_iv = mem::transmute(cmsg_data);
+                    let alg_iv = cmsg_data as *mut libc::af_alg_iv;
                     (*alg_iv).ivlen = iv.len() as u32;
                     ptr::copy_nonoverlapping(
                         iv.as_ptr(),
@@ -797,7 +795,7 @@ impl<'a> ControlMessage<'a> {
         };
         unsafe {
             ptr::copy_nonoverlapping(
-                write_data_ptr,
+                data_ptr,
                 cmsg_data,
                 self.len()
             )
@@ -869,7 +867,7 @@ impl<'a> ControlMessage<'a> {
         (*cmsg).cmsg_level = self.cmsg_level();
         (*cmsg).cmsg_type = self.cmsg_type();
         (*cmsg).cmsg_len = self.cmsg_len();
-        self.write_data(CMSG_DATA(cmsg));
+        self.copy_to_cmsg_data(CMSG_DATA(cmsg));
     }
 }
 
