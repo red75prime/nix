@@ -1033,7 +1033,7 @@ pub mod netlink {
 
 #[cfg(any(target_os = "android", target_os = "linux"))]
 pub mod alg {
-    use libc::sockaddr_alg;
+    use libc::{AF_ALG, sockaddr_alg};
     use std::{fmt, mem};
     use std::hash::{Hash, Hasher};
     use std::ffi::CStr;
@@ -1063,7 +1063,7 @@ pub mod alg {
     impl AlgAddr {
         pub fn new(alg_type: &str, alg_name: &str) -> AlgAddr {
             let mut addr: sockaddr_alg = unsafe { mem::zeroed() };
-            addr.salg_family = libc::AF_ALG as u16;
+            addr.salg_family = AF_ALG as u16;
             addr.salg_type[..alg_type.len()].copy_from_slice(alg_type.to_string().as_bytes());
             addr.salg_name[..alg_name.len()].copy_from_slice(alg_name.to_string().as_bytes());
 

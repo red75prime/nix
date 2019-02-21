@@ -711,7 +711,7 @@ pub enum ControlMessage<'a> {
         target_os = "android",
         target_os = "linux",
     ))]
-    AlgSetIv(&'a libc::af_alg_iv),
+    AlgSetIv(&'a [u8]),
     /// Set crypto operation for `AF_ALG` crypto API. It may be one of
     /// `ALG_OP_ENCRYPT` or `ALG_OP_DECRYPT`
     /// AF_ALG is only supported on linux and android.
@@ -761,9 +761,11 @@ impl<'a> ControlMessage<'a> {
         unsafe{CMSG_LEN(self.len() as libc::c_uint)}
     }
 
+
+
     /// Return a reference to the payload data as a byte pointer
-    fn data(&self) -> *const u8 {
-        match self {
+    fn write_data(&self, cmsg_data: *mut u8) {
+        let write_data_ptr = match self {
             &ControlMessage::ScmRights(fds) => {
                 fds as *const _ as *const u8
             },
@@ -773,7 +775,16 @@ impl<'a> ControlMessage<'a> {
             }
             #[cfg(any(target_os = "android", target_os = "linux"))]
             &ControlMessage::AlgSetIv(iv) => {
-                iv as *const _ as *const u8
+                unsafe {
+                    let alg_iv: *mut libc::af_alg_iv = mem::transmute(cmsg_data);
+                    (*alg_iv).ivlen = iv.len() as u32;
+                    ptr::copy_nonoverlapping(
+                        iv.as_ptr(),
+                        (*alg_iv).iv.as_mut_ptr(),
+                        iv.len()
+                    );
+                };
+                return
             },
             #[cfg(any(target_os = "android", target_os = "linux"))]
             &ControlMessage::AlgSetOp(op) => {
@@ -783,7 +794,14 @@ impl<'a> ControlMessage<'a> {
             &ControlMessage::AlgSetAeadAssoclen(len) => {
                 len as *const _ as *const u8
             },
-        }
+        };
+        unsafe {
+            ptr::copy_nonoverlapping(
+                write_data_ptr,
+                cmsg_data,
+                self.len()
+            )
+        };
     }
 
     /// The size of the payload, excluding its cmsghdr
@@ -798,7 +816,7 @@ impl<'a> ControlMessage<'a> {
             }
             #[cfg(any(target_os = "android", target_os = "linux"))]
             &ControlMessage::AlgSetIv(iv) => {
-                mem::size_of::<c_int>() + iv.ivlen as usize
+                mem::size_of::<libc::af_alg_iv>() + iv.len()
             },
             #[cfg(any(target_os = "android", target_os = "linux"))]
             &ControlMessage::AlgSetOp(op) => {
@@ -851,12 +869,7 @@ impl<'a> ControlMessage<'a> {
         (*cmsg).cmsg_level = self.cmsg_level();
         (*cmsg).cmsg_type = self.cmsg_type();
         (*cmsg).cmsg_len = self.cmsg_len();
-        let data = self.data();
-        ptr::copy_nonoverlapping(
-            data,
-            CMSG_DATA(cmsg),
-            self.len()
-        );
+        self.write_data(CMSG_DATA(cmsg));
     }
 }
 

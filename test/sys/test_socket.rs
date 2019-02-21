@@ -189,7 +189,6 @@ pub fn test_scm_rights() {
 #[cfg(any(target_os = "linux", target_os= "android"))]
 #[test]
 pub fn test_af_alg_cmsg() {
-    use std::{mem, ptr};
     use nix::sys::uio::IoVec;
     use nix::unistd::read;
     use nix::sys::socket::{socket, sendmsg, bind, accept, setsockopt,
@@ -199,41 +198,41 @@ pub fn test_af_alg_cmsg() {
 
     let alg_type = "skcipher";
     let alg_name = "ctr(aes)";
+    // 256-bits secret key
+    let key = vec![0u8; 32];
+    // 16-bytes IV
+    let iv = vec![1u8; 16];
+    // 256-bytes plain payload
+    let payload_len = 256;
+    let payload = vec![2u8; payload_len];
 
     let sock = socket(AddressFamily::Alg, SockType::SeqPacket, SockFlag::empty(), None)
         .expect("socket failed");
 
     let sockaddr = SockAddr::new_alg(alg_type, alg_name);
     bind(sock, &sockaddr).expect("bind failed");
-    let key = vec![1u8, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
-                   17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32];
 
     setsockopt(sock, AlgSetKey, &key).expect("setsockopt");
     let session_socket = accept(sock).expect("accept failed");
 
-    let iv = vec![1u8, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
-    let mut iv_storage = vec![0u8; 16 + mem::size_of::<libc::af_alg_iv>()];
-    let alg_iv: *mut libc::af_alg_iv = unsafe { mem::transmute(iv_storage.as_mut_ptr()) };
-    unsafe {
-        (*alg_iv).ivlen = 16;
-        ptr::copy_nonoverlapping(iv.as_ptr(), (*alg_iv).iv.as_mut_ptr(), 16);
-    };
-    let alg_iv = unsafe { *alg_iv };
-
-    let msgs = [ControlMessage::AlgSetOp(&libc::ALG_OP_ENCRYPT), ControlMessage::AlgSetIv(&alg_iv)];
-    let payload = vec![1, 2, 3, 4, 5, 6, 7, 8];
+    let msgs = [ControlMessage::AlgSetOp(&libc::ALG_OP_ENCRYPT), ControlMessage::AlgSetIv(iv.as_slice())];
     let iov = IoVec::from_slice(&payload);
     sendmsg(session_socket, &[iov], &msgs, MsgFlags::empty(), None).expect("sendmsg encrypt");
-    let mut encrypted = vec![0u8; 8];
+
+    // allocate buffer for encrypted data
+    let mut encrypted = vec![0u8; payload_len];
     let num_bytes = read(session_socket, &mut encrypted).expect("read encrypt");
-    assert_eq!(num_bytes, 8);
+    assert_eq!(num_bytes, payload_len);
 
     let iov = IoVec::from_slice(&encrypted);
-    let msgs = [ControlMessage::AlgSetOp(&libc::ALG_OP_DECRYPT), ControlMessage::AlgSetIv(&alg_iv)];
+    let msgs = [ControlMessage::AlgSetOp(&libc::ALG_OP_DECRYPT), ControlMessage::AlgSetIv(iv.as_slice())];
     sendmsg(session_socket, &[iov], &msgs, MsgFlags::empty(), None).expect("sendmsg decrypt");
-    let mut decrypted = vec![0u8; 8];
+
+    // allocate buffer for decrypted data
+    let mut decrypted = vec![0u8; payload_len];
     let num_bytes = read(session_socket, &mut decrypted).expect("read decrypt");
-    assert_eq!(num_bytes, 8);
+
+    assert_eq!(num_bytes, payload_len);
     assert_eq!(decrypted, payload);
 }
 
