@@ -212,6 +212,13 @@ pub fn test_af_alg_cmsg() {
     let sockaddr = SockAddr::new_alg(alg_type, alg_name);
     bind(sock, &sockaddr).expect("bind failed");
 
+    if let SockAddr::Alg(alg) = sockaddr {
+        assert_eq!(alg.alg_name(), alg_name);
+        assert_eq!(alg.alg_type(), alg_type);
+    } else {
+        panic!("unexpected SockAddr");
+    }
+
     setsockopt(sock, AlgSetKey, &key).expect("setsockopt");
     let session_socket = accept(sock).expect("accept failed");
 

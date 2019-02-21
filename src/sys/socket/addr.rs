@@ -1034,10 +1034,8 @@ pub mod netlink {
 #[cfg(any(target_os = "android", target_os = "linux"))]
 pub mod alg {
     use libc::{AF_ALG, sockaddr_alg};
-    use std::{fmt, mem};
+    use std::{fmt, mem, str};
     use std::hash::{Hash, Hasher};
-    use std::ffi::CStr;
-    use std::borrow::Cow;
 
     #[derive(Copy, Clone)]
     pub struct AlgAddr(pub sockaddr_alg);
@@ -1060,6 +1058,13 @@ pub mod alg {
         }
     }
 
+    fn to_str(bytes: &[u8]) -> &str {
+        let nul_position = bytes.iter()
+            .position(|&c| c == b'\0')
+            .unwrap_or(bytes.len());
+        unsafe { str::from_utf8_unchecked(&bytes[0..nul_position]) }
+    }
+
     impl AlgAddr {
         pub fn new(alg_type: &str, alg_name: &str) -> AlgAddr {
             let mut addr: sockaddr_alg = unsafe { mem::zeroed() };
@@ -1070,14 +1075,13 @@ pub mod alg {
             AlgAddr(addr)
         }
 
-        pub fn alg_type(&self) -> Cow<str> {
-            unsafe { CStr::from_bytes_with_nul_unchecked(&self.0.salg_type[..]) }
-                .to_string_lossy()
+
+        pub fn alg_type(&self) -> &str {
+            to_str(&self.0.salg_type)
         }
 
-        pub fn alg_name(&self) -> Cow<str> {
-            unsafe { CStr::from_bytes_with_nul_unchecked(&self.0.salg_name[..]) }
-                .to_string_lossy()
+        pub fn alg_name(&self) -> &str {
+            to_str(&self.0.salg_name)
         }
     }
 
