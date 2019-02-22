@@ -1033,9 +1033,10 @@ pub mod netlink {
 
 #[cfg(any(target_os = "android", target_os = "linux"))]
 pub mod alg {
-    use libc::{AF_ALG, sockaddr_alg};
+    use libc::{AF_ALG, sockaddr_alg, c_char};
     use std::{fmt, mem, str};
     use std::hash::{Hash, Hasher};
+    use std::ffi::CStr;
 
     #[derive(Copy, Clone)]
     pub struct AlgAddr(pub sockaddr_alg);
@@ -1058,13 +1059,6 @@ pub mod alg {
         }
     }
 
-    fn to_str(bytes: &[u8]) -> &str {
-        let nul_position = bytes.iter()
-            .position(|&c| c == b'\0')
-            .unwrap_or(bytes.len());
-        unsafe { str::from_utf8_unchecked(&bytes[0..nul_position]) }
-    }
-
     impl AlgAddr {
         pub fn new(alg_type: &str, alg_name: &str) -> AlgAddr {
             let mut addr: sockaddr_alg = unsafe { mem::zeroed() };
@@ -1076,20 +1070,20 @@ pub mod alg {
         }
 
 
-        pub fn alg_type(&self) -> &str {
-            to_str(&self.0.salg_type)
+        pub fn alg_type(&self) -> &CStr {
+            unsafe { CStr::from_ptr(self.0.salg_type.as_ptr() as *const c_char) }
         }
 
-        pub fn alg_name(&self) -> &str {
-            to_str(&self.0.salg_name)
+        pub fn alg_name(&self) -> &CStr {
+            unsafe { CStr::from_ptr(self.0.salg_name.as_ptr() as *const c_char) }
         }
     }
 
     impl fmt::Display for AlgAddr {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
             write!(f, "type: {} alg: {}",
-                   self.alg_name(),
-                   self.alg_type())
+                   self.alg_name().to_string_lossy(),
+                   self.alg_type().to_string_lossy())
         }
     }
 

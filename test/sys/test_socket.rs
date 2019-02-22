@@ -217,8 +217,8 @@ pub fn test_af_alg_cipher() {
     bind(sock, &sockaddr).expect("bind failed");
 
     if let SockAddr::Alg(alg) = sockaddr {
-        assert_eq!(alg.alg_name(), alg_name);
-        assert_eq!(alg.alg_type(), alg_type);
+        assert_eq!(alg.alg_name().to_string_lossy(), alg_name);
+        assert_eq!(alg.alg_type().to_string_lossy(), alg_type);
     } else {
         panic!("unexpected SockAddr");
     }
