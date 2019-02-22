@@ -704,7 +704,7 @@ pub enum ControlMessage<'a> {
     ScmCredentials(&'a libc::ucred),
 
     /// Set IV for `AF_ALG` crypto API.
-    /// AF_ALG is only supported on linux and android.
+    ///
     /// For further information, please refer to the
     /// [`documentation`](https://kernel.readthedocs.io/en/sphinx-samples/crypto-API.html)
     #[cfg(any(
@@ -714,7 +714,7 @@ pub enum ControlMessage<'a> {
     AlgSetIv(&'a [u8]),
     /// Set crypto operation for `AF_ALG` crypto API. It may be one of
     /// `ALG_OP_ENCRYPT` or `ALG_OP_DECRYPT`
-    /// AF_ALG is only supported on linux and android.
+    ///
     /// For further information, please refer to the
     /// [`documentation`](https://kernel.readthedocs.io/en/sphinx-samples/crypto-API.html)
     #[cfg(any(
@@ -722,9 +722,9 @@ pub enum ControlMessage<'a> {
         target_os = "linux",
     ))]
     AlgSetOp(&'a libc::c_int),
-    /// Set the length of associated authentication data (AAD) (applicable only to AEAD algoritms)
+    /// Set the length of associated authentication data (AAD) (applicable only to AEAD algorithms)
     /// for `AF_ALG` crypto API.
-    /// AF_ALG is only supported on linux and android.
+    ///
     /// For further information, please refer to the
     /// [`documentation`](https://kernel.readthedocs.io/en/sphinx-samples/crypto-API.html)
     #[cfg(any(

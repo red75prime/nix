@@ -186,7 +186,7 @@ pub fn test_scm_rights() {
     close(w).unwrap();
 }
 
-// Disable the test on emulated platforms due to a lack of support of AF_ALG in QEMU
+// Disable the test on emulated platforms due to not enabled support of AF_ALG in QEMU from rust cross
 #[cfg_attr(not(any(target_arch = "x86_64", target_arch = "i686")), ignore)]
 #[cfg(any(target_os = "linux", target_os= "android"))]
 #[test]
@@ -250,7 +250,7 @@ pub fn test_af_alg_cipher() {
     assert_eq!(decrypted, payload);
 }
 
-// Disable the test on emulated platforms due to a lack of support of AF_ALG in QEMU
+// Disable the test on emulated platforms due to not enabled support of AF_ALG in QEMU from rust cross
 #[cfg_attr(not(any(target_arch = "x86_64", target_arch = "i686")), ignore)]
 #[cfg(any(target_os = "linux", target_os= "android"))]
 #[test]
