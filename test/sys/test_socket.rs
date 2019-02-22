@@ -257,7 +257,7 @@ pub fn test_af_alg_cipher() {
 pub fn test_af_alg_aead() {
     use libc;
     use nix::sys::uio::IoVec;
-    use nix::unistd::read;
+    use nix::unistd::{read, close};
     use nix::sys::socket::{socket, sendmsg, bind, accept, setsockopt,
                            AddressFamily, SockType, SockFlag, SockAddr,
                            ControlMessage, MsgFlags};
@@ -275,10 +275,16 @@ pub fn test_af_alg_aead() {
     let iv = vec![1u8; iv_len];
     // 256-bytes plain payload
     let payload_len = 256;
-    let mut payload = vec![2u8; payload_len + (assoc_size as usize)];
+    let mut payload = vec![2u8; payload_len + (assoc_size as usize) + auth_size];
 
     for i in 0..assoc_size {
         payload[i as usize] = 10;
+    }
+
+    let len = payload.len();
+
+    for i in 0..auth_size {
+        payload[len - 1 - i] = 0;
     }
 
     let sock = socket(AddressFamily::Alg, SockType::SeqPacket, SockFlag::empty(), None)
@@ -287,8 +293,8 @@ pub fn test_af_alg_aead() {
     let sockaddr = SockAddr::new_alg(alg_type, alg_name);
     bind(sock, &sockaddr).expect("bind failed");
 
-    setsockopt(sock, AlgSetKey::default(), &key).expect("setsockopt AlgSetKey");
     setsockopt(sock, AlgSetAeadAuthSize, &auth_size).expect("setsockopt AlgSetAeadAuthSize");
+    setsockopt(sock, AlgSetKey::default(), &key).expect("setsockopt AlgSetKey");
     let session_socket = accept(sock).expect("accept failed");
 
     let msgs = [
@@ -302,10 +308,17 @@ pub fn test_af_alg_aead() {
     let mut encrypted = vec![0u8; (assoc_size as usize) + payload_len + auth_size];
     let num_bytes = read(session_socket, &mut encrypted).expect("read encrypt");
     assert_eq!(num_bytes, payload_len + auth_size + (assoc_size as usize));
+    close(session_socket).expect("close");
+
+    for i in 0..assoc_size {
+        encrypted[i as usize] = 10;
+    }
 
     let iov = IoVec::from_slice(&encrypted);
 
     let iv = vec![1u8; iv_len];
+
+    let session_socket = accept(sock).expect("accept failed");
 
     let msgs = [
         ControlMessage::AlgSetOp(&libc::ALG_OP_DECRYPT),
@@ -315,11 +328,11 @@ pub fn test_af_alg_aead() {
     sendmsg(session_socket, &[iov], &msgs, MsgFlags::empty(), None).expect("sendmsg decrypt");
 
     // allocate buffer for decrypted data
-    let mut decrypted = vec![0u8; payload_len + (assoc_size as usize)];
+    let mut decrypted = vec![0u8; payload_len + (assoc_size as usize) + auth_size];
     let num_bytes = read(session_socket, &mut decrypted).expect("read decrypt");
 
-    assert_eq!(num_bytes, payload_len + (assoc_size as usize));
-    assert_eq!(decrypted, payload);
+    assert!(num_bytes >= payload_len + (assoc_size as usize));
+    assert_eq!(decrypted[(assoc_size as usize)..(payload_len + (assoc_size as usize))], payload[(assoc_size as usize)..payload_len + (assoc_size as usize)]);
 }
 
 /// Tests that passing multiple fds using a single `ControlMessage` works.
