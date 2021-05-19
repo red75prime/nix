@@ -15,11 +15,11 @@
 //!
 //! Please note that signal discarding is not specific to `signalfd`, but also happens with regular
 //! signal handlers.
-use libc;
-use unistd;
-use {Error, Errno, Result};
-pub use sys::signal::{self, SigSet};
-pub use libc::signalfd_siginfo as siginfo;
+use ::libc;
+use crate::unistd;
+use crate::{Error, Errno, Result};
+pub use crate::sys::signal::{self, SigSet};
+pub use ::libc::signalfd_siginfo as siginfo;
 
 use std::os::unix::io::{RawFd, AsRawFd};
 use std::mem;
@@ -87,7 +87,7 @@ impl SignalFd {
     }
 
     pub fn with_flags(mask: &SigSet, flags: SfdFlags) -> Result<SignalFd> {
-        let fd = try!(signalfd(SIGNALFD_NEW, mask, flags));
+        let fd = try_new!(signalfd(SIGNALFD_NEW, mask, flags));
 
         Ok(SignalFd(fd))
     }
@@ -97,13 +97,15 @@ impl SignalFd {
     }
 
     pub fn read_signal(&mut self) -> Result<Option<siginfo>> {
-        let mut buffer: [u8; SIGNALFD_SIGINFO_SIZE] = unsafe { mem::uninitialized() };
+        let mut buffer = mem::MaybeUninit::<[u8; SIGNALFD_SIGINFO_SIZE]>::uninit();
 
-        match unistd::read(self.0, &mut buffer) {
-            Ok(SIGNALFD_SIGINFO_SIZE) => Ok(Some(unsafe { mem::transmute(buffer) })),
-            Ok(_) => unreachable!("partial read on signalfd"),
-            Err(Error::Sys(Errno::EAGAIN)) => Ok(None),
-            Err(error) => Err(error)
+        unsafe {
+            match unistd::read_uninit(self.0, buffer.as_mut_ptr() as *mut u8, SIGNALFD_SIGINFO_SIZE) {
+                Ok(SIGNALFD_SIGINFO_SIZE) => Ok(Some(mem::transmute(buffer.assume_init()))),
+                Ok(_) => unreachable!("partial read on signalfd"),
+                Err(Error::Sys(Errno::EAGAIN)) => Ok(None),
+                Err(error) => Err(error)
+            }
         }
     }
 }
@@ -137,7 +139,7 @@ impl Iterator for SignalFd {
 mod tests {
     use super::*;
     use std::mem;
-    use libc;
+    use ::libc;
 
 
     #[test]

@@ -15,7 +15,7 @@ mod test_mount {
     use std::os::unix::fs::PermissionsExt;
     use std::process::{self, Command};
 
-    use libc::{EACCES, EROFS};
+    use ::libc::{EACCES, EROFS};
 
     use nix::errno::Errno;
     use nix::mount::{mount, umount, MsFlags, MS_BIND, MS_RDONLY, MS_NOEXEC};

@@ -2,11 +2,11 @@
 //!
 //! [Further reading and details on the C API](http://man7.org/linux/man-pages/man7/mq_overview.7.html)
 
-use {Errno, Result};
+use crate::{Errno, Result};
 
-use libc::{self, c_char, c_long, mode_t, mqd_t, size_t};
+use ::libc::{self, c_char, c_long, mode_t, mqd_t, size_t};
 use std::ffi::CString;
-use sys::stat::Mode;
+use crate::sys::stat::Mode;
 use std::mem;
 
 libc_bitflags!{
@@ -49,12 +49,17 @@ impl MqAttr {
                mq_msgsize: c_long,
                mq_curmsgs: c_long)
                -> MqAttr {
-        let mut attr = unsafe { mem::uninitialized::<libc::mq_attr>() };
-        attr.mq_flags = mq_flags;
-        attr.mq_maxmsg = mq_maxmsg;
-        attr.mq_msgsize = mq_msgsize;
-        attr.mq_curmsgs = mq_curmsgs;
-        MqAttr { mq_attr: attr }
+        use std::ptr::addr_of_mut;
+
+        let mut attr = mem::MaybeUninit::<libc::mq_attr>::uninit();
+        let ptr = attr.as_mut_ptr();
+        unsafe {
+            addr_of_mut!((*ptr).mq_flags).write(mq_flags);
+            addr_of_mut!((*ptr).mq_maxmsg).write(mq_maxmsg);
+            addr_of_mut!((*ptr).mq_msgsize).write(mq_msgsize);
+            addr_of_mut!((*ptr).mq_curmsgs).write(mq_curmsgs);
+            MqAttr { mq_attr: attr.assume_init() }
+        }
     }
 
     pub fn flags(&self) -> c_long {
@@ -112,9 +117,9 @@ pub fn mq_send(mqdes: mqd_t, message: &[u8], msq_prio: u32) -> Result<()> {
 }
 
 pub fn mq_getattr(mqd: mqd_t) -> Result<MqAttr> {
-    let mut attr = unsafe { mem::uninitialized::<libc::mq_attr>() };
-    let res = unsafe { libc::mq_getattr(mqd, &mut attr) };
-    Errno::result(res).map(|_| MqAttr { mq_attr: attr })
+    let mut attr = mem::MaybeUninit::<libc::mq_attr>::uninit();
+    let res = unsafe { libc::mq_getattr(mqd, attr.as_mut_ptr()) };
+    Errno::result(res).map(|_| MqAttr { mq_attr: unsafe{ attr.assume_init() } })
 }
 
 /// Set the attributes of the message queue. Only `O_NONBLOCK` can be set, everything else will be ignored
@@ -123,17 +128,17 @@ pub fn mq_getattr(mqd: mqd_t) -> Result<MqAttr> {
 ///
 /// [Further reading](http://man7.org/linux/man-pages/man3/mq_setattr.3.html)
 pub fn mq_setattr(mqd: mqd_t, newattr: &MqAttr) -> Result<MqAttr> {
-    let mut attr = unsafe { mem::uninitialized::<libc::mq_attr>() };
-    let res = unsafe { libc::mq_setattr(mqd, &newattr.mq_attr as *const libc::mq_attr, &mut attr) };
-    Errno::result(res).map(|_| MqAttr { mq_attr: attr })
+    let mut attr = mem::MaybeUninit::<libc::mq_attr>::uninit();
+    let res = unsafe { libc::mq_setattr(mqd, &newattr.mq_attr as *const libc::mq_attr, attr.as_mut_ptr()) };
+    Errno::result(res).map(|_| MqAttr { mq_attr: unsafe { attr.assume_init() } })
 }
 
 /// Convenience function.
 /// Sets the `O_NONBLOCK` attribute for a given message queue descriptor
 /// Returns the old attributes
-pub fn mq_set_nonblock(mqd: mqd_t) -> Result<(MqAttr)> {
-    let oldattr = try!(mq_getattr(mqd));
-    let newattr = MqAttr::new(O_NONBLOCK.bits() as c_long,
+pub fn mq_set_nonblock(mqd: mqd_t) -> Result<MqAttr> {
+    let oldattr = try_new!(mq_getattr(mqd));
+    let newattr = MqAttr::new(MQ_OFlag::O_NONBLOCK.bits() as c_long,
                               oldattr.mq_attr.mq_maxmsg,
                               oldattr.mq_attr.mq_msgsize,
                               oldattr.mq_attr.mq_curmsgs);
@@ -143,8 +148,8 @@ pub fn mq_set_nonblock(mqd: mqd_t) -> Result<(MqAttr)> {
 /// Convenience function.
 /// Removes `O_NONBLOCK` attribute for a given message queue descriptor
 /// Returns the old attributes
-pub fn mq_remove_nonblock(mqd: mqd_t) -> Result<(MqAttr)> {
-    let oldattr = try!(mq_getattr(mqd));
+pub fn mq_remove_nonblock(mqd: mqd_t) -> Result<MqAttr> {
+    let oldattr = try_new!(mq_getattr(mqd));
     let newattr = MqAttr::new(0,
                               oldattr.mq_attr.mq_maxmsg,
                               oldattr.mq_attr.mq_msgsize,

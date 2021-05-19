@@ -3,7 +3,7 @@
 pub type ioctl_num_type = ::libc::c_ulong;
 
 mod consts {
-    use ::sys::ioctl::platform::ioctl_num_type;
+    use crate::sys::ioctl::platform::ioctl_num_type;
     #[doc(hidden)]
     pub const VOID: ioctl_num_type = 0x20000000;
     #[doc(hidden)]

@@ -1,7 +1,7 @@
-use {Error, Errno, Result};
+use crate::{Error, Errno, Result};
 use std::os::unix::io::RawFd;
-use libc::{c_void, off_t, size_t};
-use libc;
+use ::libc::{c_void, off_t, size_t};
+use ::libc;
 use std::fmt;
 use std::fmt::Debug;
 use std::io::Write;
@@ -10,8 +10,8 @@ use std::marker::PhantomData;
 use std::mem;
 use std::rc::Rc;
 use std::ptr::{null, null_mut};
-use sys::signal::*;
-use sys::time::TimeSpec;
+use crate::sys::signal::*;
+use crate::sys::time::TimeSpec;
 
 /// Mode for `AioCb::fsync`.  Controls whether only data or both data and
 /// metadata are synced.

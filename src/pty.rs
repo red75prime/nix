@@ -1,16 +1,16 @@
 //! Create master and slave virtual pseudo-terminals (PTYs)
 
-use libc;
+use ::libc;
 
-pub use libc::pid_t as SessionId;
-pub use libc::winsize as Winsize;
+pub use ::libc::pid_t as SessionId;
+pub use ::libc::winsize as Winsize;
 
 use std::ffi::CStr;
 use std::mem;
 use std::os::unix::prelude::*;
 
-use sys::termios::Termios;
-use {Errno, Result, Error, fcntl};
+use crate::sys::termios::Termios;
+use crate::{Errno, Result, Error, fcntl};
 
 /// Representation of a master/slave pty pair
 ///
@@ -53,7 +53,7 @@ impl Drop for PtyMaster {
         // invalid file descriptor.  That frequently indicates a double-close
         // condition, which can cause confusing errors for future I/O
         // operations.
-        let e = ::unistd::close(self.0);
+        let e = crate::unistd::close(self.0);
         if e == Err(Error::Sys(Errno::EBADF)) {
             panic!("Closing an invalid file descriptor!");
         };
@@ -196,8 +196,8 @@ pub fn unlockpt(fd: &PtyMaster) -> Result<()> {
 pub fn openpty<'a, 'b, T: Into<Option<&'a Winsize>>, U: Into<Option<&'b Termios>>>(winsize: T, termios: U) -> Result<OpenptyResult> {
     use std::ptr;
 
-    let mut slave: libc::c_int = unsafe { mem::uninitialized() };
-    let mut master: libc::c_int = unsafe { mem::uninitialized() };
+    let mut slave: libc::c_int = 0;
+    let mut master: libc::c_int = 0;
     let ret = {
         match (termios.into(), winsize.into()) {
             (Some(termios), Some(winsize)) => {

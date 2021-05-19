@@ -2,7 +2,7 @@ use nix::unistd::*;
 use nix::unistd::ForkResult::*;
 use nix::sys::signal::*;
 use nix::sys::wait::*;
-use libc::_exit;
+use ::libc::_exit;
 
 #[test]
 fn test_wait_signal() {
@@ -48,7 +48,7 @@ mod ptrace {
     use nix::unistd::*;
     use nix::unistd::ForkResult::*;
     use std::{ptr, process};
-    use libc::_exit;
+    use ::libc::_exit;
 
     fn ptrace_child() -> ! {
         let _ = ptrace(PTRACE_TRACEME, Pid::from_raw(0), ptr::null_mut(), ptr::null_mut());

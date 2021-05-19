@@ -1,7 +1,7 @@
-use {Errno, Error, Result, NixPath};
-use fcntl::OFlag;
-use libc::{self, c_void, size_t, off_t, mode_t};
-use sys::stat::Mode;
+use crate::{Errno, Error, Result, NixPath};
+use crate::fcntl::OFlag;
+use ::libc::{self, c_void, size_t, off_t, mode_t};
+use crate::sys::stat::Mode;
 use std::os::unix::io::RawFd;
 
 pub use self::consts::*;
@@ -21,7 +21,7 @@ libc_bitflags!{
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
 mod consts {
-    use libc::{self, c_int};
+    use ::libc::{self, c_int};
 
     libc_bitflags!{
         pub flags MapFlags: c_int {
@@ -78,7 +78,7 @@ mod consts {
 #[cfg(any(target_os = "macos",
           target_os = "ios"))]
 mod consts {
-    use libc::{self, c_int};
+    use ::libc::{self, c_int};
 
     libc_bitflags!{
         pub flags MapFlags: c_int {
@@ -120,7 +120,7 @@ mod consts {
 
 #[cfg(any(target_os = "freebsd", target_os = "dragonfly", target_os = "openbsd", target_os = "netbsd"))]
 mod consts {
-    use libc::{self, c_int};
+    use ::libc::{self, c_int};
 
     libc_bitflags!{
         pub flags MapFlags: c_int {
@@ -176,9 +176,9 @@ mod consts {
 }
 
 mod ffi {
-    use libc::{c_void, size_t, c_int, c_char, mode_t};
+    use ::libc::{c_void, size_t, c_int, c_char, mode_t};
 
-    pub use libc::{mmap, munmap};
+    pub use ::libc::{mmap, munmap};
 
     #[allow(improper_ctypes)]
     extern {
@@ -224,7 +224,7 @@ pub unsafe fn msync(addr: *const c_void, length: size_t, flags: MsFlags) -> Resu
 }
 
 pub fn shm_open<P: ?Sized + NixPath>(name: &P, flag: OFlag, mode: Mode) -> Result<RawFd> {
-    let ret = try!(name.with_nix_path(|cstr| {
+    let ret = try_new!(name.with_nix_path(|cstr| {
         unsafe {
             ffi::shm_open(cstr.as_ptr(), flag.bits(), mode.bits() as mode_t)
         }
@@ -234,7 +234,7 @@ pub fn shm_open<P: ?Sized + NixPath>(name: &P, flag: OFlag, mode: Mode) -> Resul
 }
 
 pub fn shm_unlink<P: ?Sized + NixPath>(name: &P) -> Result<()> {
-    let ret = try!(name.with_nix_path(|cstr| {
+    let ret = try_new!(name.with_nix_path(|cstr| {
         unsafe { ffi::shm_unlink(cstr.as_ptr()) }
     }));
 

@@ -10,6 +10,7 @@
 #![allow(dead_code)]
 #![cfg_attr(test, deny(warnings))]
 #![recursion_limit = "500"]
+#![feature(trace_macros)]
 
 #[macro_use]
 extern crate bitflags;
@@ -27,11 +28,10 @@ extern crate nix_test as nixtest;
 // to https://github.com/rust-lang/rust/issues/26775 being resolved
 // it is necessary to get a little creative.
 pub mod libc {
-    extern crate libc;
-    pub use self::libc::*;
+    pub use ::libc::*;
 }
 
-pub use errno::Errno;
+pub use crate::errno::Errno;
 
 pub mod errno;
 pub mod features;
@@ -69,14 +69,14 @@ pub mod unistd;
  *
  */
 
-use libc::c_char;
+use ::libc::c_char;
 use std::{ptr, result};
 use std::ffi::{CStr, OsStr};
 use std::path::{Path, PathBuf};
 use std::os::unix::ffi::OsStrExt;
 use std::fmt;
 use std::error;
-use libc::PATH_MAX;
+use ::libc::PATH_MAX;
 
 /// Nix Result Type
 pub type Result<T> = result::Result<T, Error>;

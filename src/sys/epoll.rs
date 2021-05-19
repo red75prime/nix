@@ -1,9 +1,9 @@
-use {Errno, Result};
-use libc::{self, c_int};
+use crate::{Errno, Result};
+use ::libc::{self, c_int};
 use std::os::unix::io::RawFd;
 use std::ptr;
 use std::mem;
-use ::Error;
+use crate::Error;
 
 libc_bitflags!(
     pub flags EpollFlags: libc::c_int {
@@ -65,15 +65,15 @@ impl EpollEvent {
     }
 }
 
-impl<'a> Into<&'a mut EpollEvent> for Option<&'a mut EpollEvent> {
-    #[inline]
-    fn into(self) -> &'a mut EpollEvent {
-        match self {
-            Some(epoll_event) => epoll_event,
-            None => unsafe { &mut *ptr::null_mut::<EpollEvent>() }
-        }
-    }
-}
+// impl<'a> Into<&'a mut EpollEvent> for Option<&'a mut EpollEvent> {
+//     #[inline]
+//     fn into(self) -> &'a mut EpollEvent {
+//         match self {
+//             Some(epoll_event) => epoll_event,
+//             None => unsafe { &mut *ptr::null_mut::<EpollEvent>() }
+//         }
+//     }
+// }
 
 #[inline]
 pub fn epoll_create() -> Result<RawFd> {

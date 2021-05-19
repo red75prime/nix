@@ -1,10 +1,10 @@
 #[cfg(any(target_os = "linux", target_os = "android"))]
-use sys::time::TimeSpec;
+use crate::sys::time::TimeSpec;
 #[cfg(any(target_os = "linux", target_os = "android"))]
-use sys::signal::SigSet;
+use crate::sys::signal::SigSet;
 
-use libc;
-use {Errno, Result};
+use ::libc;
+use crate::{Errno, Result};
 
 #[repr(C)]
 #[derive(Clone, Copy)]

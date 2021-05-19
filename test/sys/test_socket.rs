@@ -4,7 +4,7 @@ use std::net::{self, Ipv6Addr, SocketAddr, SocketAddrV6};
 use std::path::Path;
 use std::str::FromStr;
 use std::os::unix::io::RawFd;
-use libc::c_char;
+use ::libc::c_char;
 
 #[test]
 pub fn test_inetv4_addr_to_sock_addr() {

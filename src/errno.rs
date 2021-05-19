@@ -1,6 +1,6 @@
-use libc::c_int;
+use ::libc::c_int;
 use std::{fmt, io, error};
-use {Error, Result};
+use crate::{Error, Result};
 
 pub use self::consts::*;
 pub use self::consts::Errno::*;
@@ -528,7 +528,7 @@ fn desc(errno: Errno) -> &'static str {
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
 mod consts {
-    use libc;
+    use ::libc;
 
     #[derive(Debug, Clone, PartialEq, Copy)]
     pub enum Errno {
@@ -1915,7 +1915,7 @@ mod consts {
 mod test {
     use super::*;
     use nixtest::assert_const_eq;
-    use libc::c_int;
+    use ::libc::c_int;
 
     macro_rules! check_errno {
         ($($errno:ident),+) => {{

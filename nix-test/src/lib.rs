@@ -2,10 +2,10 @@ extern crate libc;
 
 use std::fmt;
 use std::ffi::CString;
-use libc::{c_int, c_char};
+use ::libc::{c_int, c_char};
 
 mod ffi {
-    use libc::{c_int, c_char, size_t};
+    use ::libc::{c_int, c_char, size_t};
 
     #[link(name = "nixtest", kind = "static")]
     extern {

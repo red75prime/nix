@@ -2,7 +2,7 @@ use std::fs::File;
 use std::os::unix::fs::symlink;
 use std::os::unix::prelude::AsRawFd;
 
-use libc::{S_IFMT, S_IFLNK};
+use ::libc::{S_IFMT, S_IFLNK};
 
 use nix::fcntl;
 use nix::sys::stat::{self, stat, fstat, lstat};

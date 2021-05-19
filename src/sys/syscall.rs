@@ -1,12 +1,12 @@
 //! Indirect system call
 //!
-use libc::c_int;
+use ::libc::c_int;
 
 pub use self::arch::*;
 
 #[cfg(target_arch = "x86_64")]
 mod arch {
-    use libc::c_long;
+    use ::libc::c_long;
 
     pub type Syscall = c_long;
 
@@ -16,7 +16,7 @@ mod arch {
 
 #[cfg(target_arch = "x86")]
 mod arch {
-    use libc::c_long;
+    use ::libc::c_long;
 
     pub type Syscall = c_long;
 
@@ -26,7 +26,7 @@ mod arch {
 
 #[cfg(target_arch = "aarch64")]
 mod arch {
-    use libc::c_long;
+    use ::libc::c_long;
 
     pub type Syscall = c_long;
 
@@ -36,7 +36,7 @@ mod arch {
 
 #[cfg(target_arch = "arm")]
 mod arch {
-    use libc::c_long;
+    use ::libc::c_long;
 
     pub type Syscall = c_long;
 
@@ -47,7 +47,7 @@ mod arch {
 // Rust on mips uses the N32 ABI
 #[cfg(target_arch = "mips")]
 mod arch {
-    use libc::c_long;
+    use ::libc::c_long;
 
     pub type Syscall = c_long;
 
@@ -58,7 +58,7 @@ mod arch {
 // Rust on mips64 uses the N64 ABI
 #[cfg(target_arch = "mips64")]
 mod arch {
-    use libc::c_long;
+    use ::libc::c_long;
 
     pub type Syscall = c_long;
 
@@ -68,7 +68,7 @@ mod arch {
 
 #[cfg(any(target_arch = "powerpc", target_arch = "powerpc64"))]
 mod arch {
-    use libc::c_long;
+    use ::libc::c_long;
 
     pub type Syscall = c_long;
 
@@ -78,7 +78,7 @@ mod arch {
 
 #[cfg(target_arch = "s390x")]
 mod arch {
-    use libc::c_long;
+    use ::libc::c_long;
 
     pub type Syscall = c_long;
 

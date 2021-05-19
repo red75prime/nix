@@ -1,14 +1,14 @@
 //! Socket interface functions
 //!
 //! [Further reading](http://man7.org/linux/man-pages/man7/socket.7.html)
-use {Error, Errno, Result};
-use features;
-use fcntl::{fcntl, FD_CLOEXEC, O_NONBLOCK};
-use fcntl::FcntlArg::{F_SETFD, F_SETFL};
-use libc::{c_void, c_int, socklen_t, size_t, pid_t, uid_t, gid_t};
+use crate::{Error, Errno, Result};
+use crate::features;
+use crate::fcntl::{fcntl, FdFlag, OFlag};
+use crate::fcntl::FcntlArg::{F_SETFD, F_SETFL};
+use ::libc::{c_void, c_int, socklen_t, size_t, pid_t, uid_t, gid_t};
 use std::{mem, ptr, slice};
 use std::os::unix::io::RawFd;
-use sys::uio::IoVec;
+use crate::sys::uio::IoVec;
 
 mod addr;
 mod consts;
@@ -32,9 +32,9 @@ pub use self::addr::{
     Ipv6Addr,
 };
 #[cfg(any(target_os = "linux", target_os = "android"))]
-pub use ::sys::socket::addr::netlink::NetlinkAddr;
+pub use crate::sys::socket::addr::netlink::NetlinkAddr;
 
-pub use libc::{
+pub use ::libc::{
     in_addr,
     in6_addr,
     sockaddr,
@@ -50,7 +50,7 @@ pub use self::multicast::{
 };
 pub use self::consts::*;
 
-pub use libc::sockaddr_storage;
+pub use ::libc::sockaddr_storage;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[repr(i32)]
@@ -95,6 +95,7 @@ use self::ffi::{cmsghdr, msghdr, type_of_cmsg_len, type_of_cmsg_data};
 /// To make room for multiple messages, nest the type parameter with
 /// tuples, e.g.
 /// `let cmsg: CmsgSpace<([RawFd; 3], CmsgSpace<[RawFd; 2]>)> = CmsgSpace::new();`
+#[repr(C)]
 pub struct CmsgSpace<T> {
     _hdr: cmsghdr,
     _data: T,
@@ -103,9 +104,9 @@ pub struct CmsgSpace<T> {
 impl<T> CmsgSpace<T> {
     /// Create a CmsgSpace<T>. The structure is used only for space, so
     /// the fields are uninitialized.
-    pub fn new() -> Self {
+    pub fn new() -> mem::MaybeUninit<Self> {
         // Safe because the fields themselves aren't accessible.
-        unsafe { mem::uninitialized() }
+        mem::MaybeUninit::uninit()
     }
 }
 
@@ -300,14 +301,14 @@ pub fn sendmsg<'a>(fd: RawFd, iov: &[IoVec<&'a [u8]>], cmsgs: &[ControlMessage<'
 /// Receive message in scatter-gather vectors from a socket, and
 /// optionally receive ancillary data into the provided buffer.
 /// If no ancillary data is desired, use () as the type parameter.
-pub fn recvmsg<'a, T>(fd: RawFd, iov: &[IoVec<&mut [u8]>], cmsg_buffer: Option<&'a mut CmsgSpace<T>>, flags: MsgFlags) -> Result<RecvMsg<'a>> {
-    let mut address: sockaddr_storage = unsafe { mem::uninitialized() };
+pub fn recvmsg<'a, T>(fd: RawFd, iov: &[IoVec<&mut [u8]>], cmsg_buffer: Option<&'a mut mem::MaybeUninit<CmsgSpace<T>>>, flags: MsgFlags) -> Result<RecvMsg<'a>> {
+    let mut address = mem::MaybeUninit::<sockaddr_storage>::uninit();
     let (msg_control, msg_controllen) = match cmsg_buffer {
-        Some(cmsg_buffer) => (cmsg_buffer as *mut _, mem::size_of_val(cmsg_buffer)),
+        Some(cmsg_buffer) => (cmsg_buffer.as_mut_ptr(), mem::size_of_val(cmsg_buffer)),
         None => (0 as *mut _, 0),
     };
     let mut mhdr = msghdr {
-        msg_name: &mut address as *const _ as *const c_void,
+        msg_name: address.as_mut_ptr() as *const c_void,
         msg_namelen: mem::size_of::<sockaddr_storage>() as socklen_t,
         msg_iov: iov.as_ptr() as *const IoVec<&[u8]>, // safe cast to add const-ness
         msg_iovlen: iov.len() as size_t,
@@ -318,10 +319,10 @@ pub fn recvmsg<'a, T>(fd: RawFd, iov: &[IoVec<&mut [u8]>], cmsg_buffer: Option<&
     let ret = unsafe { ffi::recvmsg(fd, &mut mhdr, flags.bits()) };
 
     Ok(unsafe { RecvMsg {
-        bytes: try!(Errno::result(ret)) as usize,
+        bytes: Errno::result(ret)? as usize,
         cmsg_buffer: slice::from_raw_parts(mhdr.msg_control as *const u8,
                                            mhdr.msg_controllen as usize),
-        address: sockaddr_storage_to_addr(&address,
+        address: sockaddr_storage_to_addr(&address.assume_init(),
                                           mhdr.msg_namelen as usize).ok(),
         flags: MsgFlags::from_bits_truncate(mhdr.msg_flags),
     } })
@@ -340,15 +341,15 @@ pub fn socket(domain: AddressFamily, ty: SockType, flags: SockFlag, protocol: c_
     }
 
     // TODO: Check the kernel version
-    let res = try!(Errno::result(unsafe { ffi::socket(domain as c_int, ty, protocol) }));
+    let res = try_new!(Errno::result(unsafe { ffi::socket(domain as c_int, ty, protocol) }));
 
     if !feat_atomic {
-        if flags.contains(SOCK_CLOEXEC) {
-            try!(fcntl(res, F_SETFD(FD_CLOEXEC)));
+        if flags.contains(SockFlag::SOCK_CLOEXEC) {
+            try_new!(fcntl(res, F_SETFD(FdFlag::FD_CLOEXEC)));
         }
 
-        if flags.contains(SOCK_NONBLOCK) {
-            try!(fcntl(res, F_SETFL(O_NONBLOCK)));
+        if flags.contains(SockFlag::SOCK_NONBLOCK) {
+            try_new!(fcntl(res, F_SETFL(OFlag::O_NONBLOCK)));
         }
     }
 
@@ -370,17 +371,17 @@ pub fn socketpair(domain: AddressFamily, ty: SockType, protocol: c_int,
     let res = unsafe {
         ffi::socketpair(domain as c_int, ty, protocol, fds.as_mut_ptr())
     };
-    try!(Errno::result(res));
+    try_new!(Errno::result(res));
 
     if !feat_atomic {
-        if flags.contains(SOCK_CLOEXEC) {
-            try!(fcntl(fds[0], F_SETFD(FD_CLOEXEC)));
-            try!(fcntl(fds[1], F_SETFD(FD_CLOEXEC)));
+        if flags.contains(SockFlag::SOCK_CLOEXEC) {
+            try_new!(fcntl(fds[0], F_SETFD(FdFlag::FD_CLOEXEC)));
+            try_new!(fcntl(fds[1], F_SETFD(FdFlag::FD_CLOEXEC)));
         }
 
-        if flags.contains(SOCK_NONBLOCK) {
-            try!(fcntl(fds[0], F_SETFL(O_NONBLOCK)));
-            try!(fcntl(fds[1], F_SETFL(O_NONBLOCK)));
+        if flags.contains(SockFlag::SOCK_NONBLOCK) {
+            try_new!(fcntl(fds[0], F_SETFL(OFlag::O_NONBLOCK)));
+            try_new!(fcntl(fds[1], F_SETFL(OFlag::O_NONBLOCK)));
         }
     }
     Ok((fds[0], fds[1]))
@@ -441,14 +442,14 @@ pub fn accept4(sockfd: RawFd, flags: SockFlag) -> Result<RawFd> {
 
 #[inline]
 fn accept4_polyfill(sockfd: RawFd, flags: SockFlag) -> Result<RawFd> {
-    let res = try!(Errno::result(unsafe { ffi::accept(sockfd, ptr::null_mut(), ptr::null_mut()) }));
+    let res = try_new!(Errno::result(unsafe { ffi::accept(sockfd, ptr::null_mut(), ptr::null_mut()) }));
 
-    if flags.contains(SOCK_CLOEXEC) {
-        try!(fcntl(res, F_SETFD(FD_CLOEXEC)));
+    if flags.contains(SockFlag::SOCK_CLOEXEC) {
+        try_new!(fcntl(res, F_SETFD(FdFlag::FD_CLOEXEC)));
     }
 
-    if flags.contains(SOCK_NONBLOCK) {
-        try!(fcntl(res, F_SETFL(O_NONBLOCK)));
+    if flags.contains(SockFlag::SOCK_NONBLOCK) {
+        try_new!(fcntl(res, F_SETFL(OFlag::O_NONBLOCK)));
     }
 
     Ok(res)
@@ -491,7 +492,7 @@ pub fn recvfrom(sockfd: RawFd, buf: &mut [u8]) -> Result<(usize, SockAddr)> {
         let addr: sockaddr_storage = mem::zeroed();
         let mut len = mem::size_of::<sockaddr_storage>() as socklen_t;
 
-        let ret = try!(Errno::result(ffi::recvfrom(
+        let ret = try_new!(Errno::result(ffi::recvfrom(
             sockfd,
             buf.as_ptr() as *mut c_void,
             buf.len() as size_t,
@@ -597,14 +598,14 @@ pub fn setsockopt<O: SetSockOpt>(fd: RawFd, opt: O, val: &O::Val) -> Result<()> 
 /// [Further reading](http://man7.org/linux/man-pages/man2/getpeername.2.html)
 pub fn getpeername(fd: RawFd) -> Result<SockAddr> {
     unsafe {
-        let addr: sockaddr_storage = mem::uninitialized();
+        let mut addr = mem::MaybeUninit::<sockaddr_storage>::uninit();
         let mut len = mem::size_of::<sockaddr_storage>() as socklen_t;
 
-        let ret = ffi::getpeername(fd, mem::transmute(&addr), &mut len);
+        let ret = ffi::getpeername(fd, addr.as_mut_ptr() as *mut _, &mut len);
 
-        try!(Errno::result(ret));
+        Errno::result(ret)?;
 
-        sockaddr_storage_to_addr(&addr, len as usize)
+        sockaddr_storage_to_addr(addr.as_ptr(), len as usize)
     }
 }
 
@@ -613,14 +614,14 @@ pub fn getpeername(fd: RawFd) -> Result<SockAddr> {
 /// [Further reading](http://man7.org/linux/man-pages/man2/getsockname.2.html)
 pub fn getsockname(fd: RawFd) -> Result<SockAddr> {
     unsafe {
-        let addr: sockaddr_storage = mem::uninitialized();
+        let mut addr = mem::MaybeUninit::<sockaddr_storage>::uninit();
         let mut len = mem::size_of::<sockaddr_storage>() as socklen_t;
 
-        let ret = ffi::getsockname(fd, mem::transmute(&addr), &mut len);
+        let ret = ffi::getsockname(fd, addr.as_mut_ptr() as *mut _, &mut len);
 
-        try!(Errno::result(ret));
+        Errno::result(ret)?;
 
-        sockaddr_storage_to_addr(&addr, len as usize)
+        sockaddr_storage_to_addr(addr.as_ptr(), len as usize)
     }
 }
 
@@ -631,14 +632,15 @@ pub fn getsockname(fd: RawFd) -> Result<SockAddr> {
 /// of the structure.  Note that in the case of a `sockaddr_un`, `len` need not
 /// include the terminating null.
 pub unsafe fn sockaddr_storage_to_addr(
-    addr: &sockaddr_storage,
-    len: usize) -> Result<SockAddr> {
+    addr: *const sockaddr_storage,
+    len: usize
+) -> Result<SockAddr> {
 
-    if len < mem::size_of_val(&addr.ss_family) {
+    if len < mem::size_of::<libc::sa_family_t>() {
         return Err(Error::Sys(Errno::ENOTCONN));
     }
 
-    match addr.ss_family as c_int {
+    match std::ptr::addr_of!((*addr).ss_family).read() as c_int {
         consts::AF_INET => {
             assert!(len as usize == mem::size_of::<sockaddr_in>());
             let ret = *(addr as *const _ as *const sockaddr_in);
@@ -646,16 +648,16 @@ pub unsafe fn sockaddr_storage_to_addr(
         }
         consts::AF_INET6 => {
             assert!(len as usize == mem::size_of::<sockaddr_in6>());
-            Ok(SockAddr::Inet(InetAddr::V6((*(addr as *const _ as *const sockaddr_in6)))))
+            Ok(SockAddr::Inet(InetAddr::V6(*(addr as *const _ as *const sockaddr_in6))))
         }
         consts::AF_UNIX => {
             let sun = *(addr as *const _ as *const sockaddr_un);
-            let pathlen = len - offset_of!(sockaddr_un, sun_path);
+            let pathlen = len - offset_of!(sockaddr_un, &sun, sun_path) as usize;
             Ok(SockAddr::Unix(UnixAddr(sun, pathlen)))
         }
         #[cfg(any(target_os = "linux", target_os = "android"))]
         consts::AF_NETLINK => {
-            use libc::sockaddr_nl;
+            use ::libc::sockaddr_nl;
             Ok(SockAddr::Netlink(NetlinkAddr(*(addr as *const _ as *const sockaddr_nl))))
         }
         af => panic!("unexpected address family {}", af),
@@ -678,7 +680,7 @@ pub enum Shutdown {
 /// [Further reading](http://man7.org/linux/man-pages/man2/shutdown.2.html)
 pub fn shutdown(df: RawFd, how: Shutdown) -> Result<()> {
     unsafe {
-        use libc::shutdown;
+        use ::libc::shutdown;
 
         let how = match how {
             Shutdown::Read  => consts::SHUT_RD,

@@ -1,4 +1,4 @@
-use libc::{self, pthread_t};
+use ::libc::{self, pthread_t};
 
 pub type Pthread = pthread_t;
 

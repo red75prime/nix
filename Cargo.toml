@@ -2,7 +2,7 @@
 
 name        = "nix"
 description = "Rust friendly bindings to *nix APIs"
-version     = "0.9.0"
+version     = "0.9.1"
 authors     = ["The nix-rust Project Developers"]
 repository  = "https://github.com/nix-rust/nix"
 license     = "MIT"
@@ -13,10 +13,12 @@ exclude     = [
   "deploy.sh",
   "test/**/*"
 ]
+edition = "2018"
+
 
 [dependencies]
-libc = "0.2.25"
-bitflags = "0.9"
+libc = "0.2.94"
+bitflags = "1.2"
 cfg-if = "0.1.0"
 void = "1.0.2"
 

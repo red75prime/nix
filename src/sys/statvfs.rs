@@ -2,7 +2,7 @@
 //!
 //! See the `vfs::Statvfs` struct for some rusty wrappers
 
-use {Errno, Result, NixPath};
+use crate::{Errno, Result, NixPath};
 use std::os::unix::io::AsRawFd;
 
 pub mod vfs {
@@ -11,9 +11,9 @@ pub mod vfs {
     //! The `Statvfs` struct has some wrappers methods around the `statvfs` and
     //! `fstatvfs` calls.
 
-    use libc::{c_ulong,c_int};
+    use ::libc::{c_ulong,c_int};
     use std::os::unix::io::AsRawFd;
-    use {Result, NixPath};
+    use crate::{Result, NixPath};
 
     use super::{statvfs, fstatvfs};
 
@@ -130,8 +130,8 @@ pub mod vfs {
 }
 
 mod ffi {
-    use libc::{c_char, c_int};
-    use sys::statvfs::vfs;
+    use ::libc::{c_char, c_int};
+    use crate::sys::statvfs::vfs;
 
     extern {
         pub fn statvfs(path: * const c_char, buf: *mut vfs::Statvfs) -> c_int;
@@ -143,7 +143,7 @@ mod ffi {
 pub fn statvfs<P: ?Sized + NixPath>(path: &P, stat: &mut vfs::Statvfs) -> Result<()> {
     unsafe {
         Errno::clear();
-        let res = try!(
+        let res = try_new!(
             path.with_nix_path(|path| ffi::statvfs(path.as_ptr(), stat))
         );
 
@@ -162,7 +162,7 @@ pub fn fstatvfs<T: AsRawFd>(fd: &T, stat: &mut vfs::Statvfs) -> Result<()> {
 #[cfg(test)]
 mod test {
     use std::fs::File;
-    use sys::statvfs::*;
+    use crate::sys::statvfs::*;
 
     #[test]
     fn statvfs_call() {

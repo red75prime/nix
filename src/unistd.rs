@@ -1,18 +1,17 @@
 //! Safe wrappers around functions found in libc "unistd.h" header
 
-use errno;
-use {Errno, Error, Result, NixPath};
-use fcntl::{fcntl, OFlag, O_CLOEXEC, FD_CLOEXEC};
-use fcntl::FcntlArg::F_SETFD;
-use libc::{self, c_char, c_void, c_int, c_long, c_uint, size_t, pid_t, off_t,
+use crate::errno;
+use crate::{Errno, Error, Result, NixPath};
+use crate::fcntl::{fcntl, OFlag, FdFlag};
+use crate::fcntl::FcntlArg::F_SETFD;
+use ::libc::{self, c_char, c_void, c_int, c_long, c_uint, size_t, pid_t, off_t,
            uid_t, gid_t, mode_t};
-use std::mem;
 use std::ffi::{CString, CStr, OsString, OsStr};
 use std::os::unix::ffi::{OsStringExt, OsStrExt};
 use std::os::unix::io::RawFd;
 use std::path::{PathBuf};
 use void::Void;
-use sys::stat::Mode;
+use crate::sys::stat::Mode;
 use std::fmt;
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -355,10 +354,10 @@ fn dup3_polyfill(oldfd: RawFd, newfd: RawFd, flags: OFlag) -> Result<RawFd> {
         return Err(Error::Sys(Errno::EINVAL));
     }
 
-    let fd = try!(dup2(oldfd, newfd));
+    let fd = try_new!(dup2(oldfd, newfd));
 
-    if flags.contains(O_CLOEXEC) {
-        if let Err(e) = fcntl(fd, F_SETFD(FD_CLOEXEC)) {
+    if flags.contains(OFlag::O_CLOEXEC) {
+        if let Err(e) = fcntl(fd, F_SETFD(FdFlag::FD_CLOEXEC)) {
             let _ = close(fd);
             return Err(e);
         }
@@ -374,7 +373,7 @@ fn dup3_polyfill(oldfd: RawFd, newfd: RawFd, flags: OFlag) -> Result<RawFd> {
 /// pages for additional details on possible failure cases.
 #[inline]
 pub fn chdir<P: ?Sized + NixPath>(path: &P) -> Result<()> {
-    let res = try!(path.with_nix_path(|cstr| {
+    let res = try_new!(path.with_nix_path(|cstr| {
         unsafe { libc::chdir(cstr.as_ptr()) }
     }));
 
@@ -430,7 +429,7 @@ pub fn fchdir(dirfd: RawFd) -> Result<()> {
 /// ```
 #[inline]
 pub fn mkdir<P: ?Sized + NixPath>(path: &P, mode: Mode) -> Result<()> {
-    let res = try!(path.with_nix_path(|cstr| {
+    let res = try_new!(path.with_nix_path(|cstr| {
         unsafe { libc::mkdir(cstr.as_ptr(), mode.bits() as mode_t) }
     }));
 
@@ -501,7 +500,7 @@ pub fn getcwd() -> Result<PathBuf> {
 /// additional details.
 #[inline]
 pub fn chown<P: ?Sized + NixPath>(path: &P, owner: Option<Uid>, group: Option<Gid>) -> Result<()> {
-    let res = try!(path.with_nix_path(|cstr| {
+    let res = try_new!(path.with_nix_path(|cstr| {
         // According to the POSIX specification, -1 is used to indicate that
         // owner and group, respectively, are not to be changed. Since uid_t and
         // gid_t are unsigned types, we use wrapping_sub to get '-1'.
@@ -515,7 +514,6 @@ pub fn chown<P: ?Sized + NixPath>(path: &P, owner: Option<Uid>, group: Option<Gi
 
 fn to_exec_array(args: &[CString]) -> Vec<*const c_char> {
     use std::ptr;
-    use libc::c_char;
 
     let mut args_p: Vec<*const c_char> = args.iter().map(|s| s.as_ptr()).collect();
     args_p.push(ptr::null());
@@ -721,6 +719,12 @@ pub fn close(fd: RawFd) -> Result<()> {
     Errno::result(res).map(drop)
 }
 
+pub(crate) unsafe fn read_uninit(fd: RawFd, buf: *mut u8, len: usize) -> Result<usize> {
+    let res = libc::read(fd, buf as *mut c_void, len as size_t);
+
+    Errno::result(res).map(|r| r as usize)
+}
+
 pub fn read(fd: RawFd, buf: &mut [u8]) -> Result<usize> {
     let res = unsafe { libc::read(fd, buf.as_mut_ptr() as *mut c_void, buf.len() as size_t) };
 
@@ -769,11 +773,11 @@ pub fn lseek64(fd: RawFd, offset: libc::off64_t, whence: Whence) -> Result<libc:
 
 pub fn pipe() -> Result<(RawFd, RawFd)> {
     unsafe {
-        let mut fds: [c_int; 2] = mem::uninitialized();
+        let mut fds: [c_int; 2] = [0, 0];
 
         let res = libc::pipe(fds.as_mut_ptr());
 
-        try!(Errno::result(res));
+        Errno::result(res)?;
 
         Ok((fds[0], fds[1]))
     }
@@ -784,11 +788,11 @@ pub fn pipe() -> Result<(RawFd, RawFd)> {
           target_os = "android",
           target_os = "emscripten"))]
 pub fn pipe2(flags: OFlag) -> Result<(RawFd, RawFd)> {
-    let mut fds: [c_int; 2] = unsafe { mem::uninitialized() };
+    let mut fds: [c_int; 2] = [0, 0];
 
     let res = unsafe { libc::pipe2(fds.as_mut_ptr(), flags.bits()) };
 
-    try!(Errno::result(res));
+    try_new!(Errno::result(res));
 
     Ok((fds[0], fds[1]))
 }
@@ -801,9 +805,9 @@ pub fn pipe2(flags: OFlag) -> Result<(RawFd, RawFd)> {
 
     let res = unsafe { libc::pipe(fds.as_mut_ptr()) };
 
-    try!(Errno::result(res));
+    try_new!(Errno::result(res));
 
-    try!(pipe2_setflags(fds[0], fds[1], flags));
+    try_new!(pipe2_setflags(fds[0], fds[1], flags));
 
     Ok((fds[0], fds[1]))
 }
@@ -812,8 +816,8 @@ pub fn pipe2(flags: OFlag) -> Result<(RawFd, RawFd)> {
               target_os = "android",
               target_os = "emscripten")))]
 fn pipe2_setflags(fd1: RawFd, fd2: RawFd, flags: OFlag) -> Result<()> {
-    use fcntl::O_NONBLOCK;
-    use fcntl::FcntlArg::F_SETFL;
+    use crate::fcntl::O_NONBLOCK;
+    use crate::fcntl::FcntlArg::F_SETFL;
 
     let mut res = Ok(0);
 
@@ -844,8 +848,6 @@ pub fn ftruncate(fd: RawFd, len: off_t) -> Result<()> {
 }
 
 pub fn isatty(fd: RawFd) -> Result<bool> {
-    use libc;
-
     unsafe {
         // ENOTTY means `fd` is a valid file descriptor, but not a TTY, so
         // we return `Ok(false)`
@@ -861,7 +863,7 @@ pub fn isatty(fd: RawFd) -> Result<bool> {
 }
 
 pub fn unlink<P: ?Sized + NixPath>(path: &P) -> Result<()> {
-    let res = try!(path.with_nix_path(|cstr| {
+    let res = try_new!(path.with_nix_path(|cstr| {
         unsafe {
             libc::unlink(cstr.as_ptr())
         }
@@ -871,7 +873,7 @@ pub fn unlink<P: ?Sized + NixPath>(path: &P) -> Result<()> {
 
 #[inline]
 pub fn chroot<P: ?Sized + NixPath>(path: &P) -> Result<()> {
-    let res = try!(path.with_nix_path(|cstr| {
+    let res = try_new!(path.with_nix_path(|cstr| {
         unsafe { libc::chroot(cstr.as_ptr()) }
     }));
 
@@ -975,13 +977,13 @@ pub fn sleep(seconds: libc::c_uint) -> c_uint {
 /// ```
 #[inline]
 pub fn mkstemp<P: ?Sized + NixPath>(template: &P) -> Result<(RawFd, PathBuf)> {
-    let mut path = try!(template.with_nix_path(|path| {path.to_bytes_with_nul().to_owned()}));
+    let mut path = try_new!(template.with_nix_path(|path| {path.to_bytes_with_nul().to_owned()}));
     let p = path.as_mut_ptr() as *mut _;
     let fd = unsafe { libc::mkstemp(p) };
     let last = path.pop(); // drop the trailing nul
     debug_assert!(last == Some(b'\0'));
     let pathname = OsString::from_vec(path);
-    try!(Errno::result(fd));
+    try_new!(Errno::result(fd));
     Ok((fd, PathBuf::from(pathname)))
 }
 
@@ -1142,7 +1144,7 @@ pub fn fpathconf(fd: RawFd, var: PathconfVar) -> Result<Option<c_long>> {
 ///     unsupported (for option variables)
 /// - `Err(x)`: an error occurred
 pub fn pathconf<P: ?Sized + NixPath>(path: &P, var: PathconfVar) -> Result<Option<c_long>> {
-    let raw = try!(path.with_nix_path(|cstr| {
+    let raw = try_new!(path.with_nix_path(|cstr| {
         unsafe {
             Errno::clear();
             libc::pathconf(cstr.as_ptr(), var as c_int)
@@ -1603,14 +1605,14 @@ pub fn sysconf(var: SysconfVar) -> Result<Option<c_long>> {
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
 mod linux {
-    use libc;
-    use sys::syscall::{syscall, SYSPIVOTROOT};
-    use {Errno, Result, NixPath};
+    use ::libc;
+    use crate::sys::syscall::{syscall, SYSPIVOTROOT};
+    use crate::{Errno, Result, NixPath};
     use super::{Uid, Gid};
 
     pub fn pivot_root<P1: ?Sized + NixPath, P2: ?Sized + NixPath>(
             new_root: &P1, put_old: &P2) -> Result<()> {
-        let res = try!(try!(new_root.with_nix_path(|new_root| {
+        let res = try_new!(try_new!(new_root.with_nix_path(|new_root| {
             put_old.with_nix_path(|put_old| {
                 unsafe {
                     syscall(SYSPIVOTROOT, new_root.as_ptr(), put_old.as_ptr())

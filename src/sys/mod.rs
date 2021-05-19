@@ -51,8 +51,8 @@ pub mod uio;
 
 pub mod time;
 
-#[cfg(any(target_os = "linux", target_os = "android"))]
-pub mod ptrace;
+// #[cfg(any(target_os = "linux", target_os = "android"))]
+// pub mod ptrace;
 
 pub mod select;
 

@@ -1,8 +1,8 @@
-use libc;
+use ::libc;
 #[cfg(not(target_env = "musl"))]
-use {Errno, Result};
+use crate::{Errno, Result};
 use std::mem;
-use sys::signal::SigSet;
+use crate::sys::signal::SigSet;
 
 #[derive(Clone, Copy)]
 pub struct UContext {

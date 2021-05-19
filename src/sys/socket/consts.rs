@@ -2,7 +2,7 @@ pub use self::os::*;
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
 mod os {
-    use libc::{self, c_int, uint8_t};
+    use ::libc::{self, c_int};
 
     pub const AF_UNIX: c_int  = libc::AF_UNIX;
     pub const AF_LOCAL: c_int = libc::AF_LOCAL;
@@ -71,7 +71,7 @@ mod os {
     // Socket options for the IP layer of the socket
     pub const IP_MULTICAST_IF: c_int = 32;
 
-    pub type IpMulticastTtl = uint8_t;
+    pub type IpMulticastTtl = u8;
 
     pub const IP_MULTICAST_TTL: c_int = libc::IP_MULTICAST_TTL;
     pub const IP_MULTICAST_LOOP: c_int = libc::IP_MULTICAST_LOOP;
@@ -117,9 +117,9 @@ mod os {
     #[cfg(any(target_os = "macos",
               target_os = "ios",
               target_os = "freebsd"))]
-    use libc::{self, c_int, uint8_t};
+    use ::libc::{self, c_int};
     #[cfg(any(target_os = "openbsd", target_os = "netbsd"))]
-    use libc::{self, c_int, uint8_t};
+    use ::libc::{self, c_int};
 
     pub const AF_UNIX: c_int  = libc::AF_UNIX;
     pub const AF_LOCAL: c_int = libc::AF_LOCAL;
@@ -199,7 +199,7 @@ mod os {
     // Socket options for the IP layer of the socket
     pub const IP_MULTICAST_IF: c_int = 9;
 
-    pub type IpMulticastTtl = uint8_t;
+    pub type IpMulticastTtl = u8;
 
     pub const IP_MULTICAST_TTL: c_int = libc::IP_MULTICAST_TTL;
     pub const IP_MULTICAST_LOOP: c_int = libc::IP_MULTICAST_LOOP;
@@ -239,7 +239,7 @@ mod os {
 
 #[cfg(target_os = "dragonfly")]
 mod os {
-    use libc::{c_int, uint8_t};
+    use ::libc::c_int;
 
     pub const AF_UNIX: c_int  = libc::AF_UNIX;
     pub const AF_LOCAL: c_int = libc::AF_LOCAL;
@@ -286,7 +286,7 @@ mod os {
     // Socket options for the IP layer of the socket
     pub const IP_MULTICAST_IF: c_int = 9;
 
-    pub type IpMulticastTtl = uint8_t;
+    pub type IpMulticastTtl = u8;
 
     pub const IP_MULTICAST_TTL: c_int = libc::IP_MULTICAST_TTL;
     pub const IP_MULTICAST_LOOP: c_int = libc::IP_MULTICAST_LOOP;
@@ -321,7 +321,7 @@ mod os {
 mod test {
     use super::*;
     use nixtest::{assert_const_eq,get_int_const,GetConst};
-    use libc::{c_char};
+    use ::libc::{c_char};
     use std::fmt;
 
     impl fmt::Display for MsgFlags {

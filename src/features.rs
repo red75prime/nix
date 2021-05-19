@@ -2,7 +2,7 @@ pub use self::os::*;
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
 mod os {
-    use sys::utsname::uname;
+    use crate::sys::utsname::uname;
 
     // Features:
     // * atomic cloexec on socket: 2.6.27
@@ -38,7 +38,7 @@ mod os {
                 b'.' | b'-' => {
                     curr += 1;
                 }
-                b'0'...b'9' => {
+                b'0'..=b'9' => {
                     match curr {
                         0 => digit(&mut major, b),
                         1 => digit(&mut minor, b),

@@ -1,5 +1,5 @@
-use {Errno, Result, NixPath};
-use libc::{c_int, c_char};
+use crate::{Errno, Result, NixPath};
+use ::libc::{c_int, c_char};
 
 #[cfg(all(target_os = "linux",
           any(target_arch = "x86",
@@ -7,7 +7,7 @@ use libc::{c_int, c_char};
               target_arch = "arm")),
           )]
 pub mod quota {
-    use libc::{self, c_int};
+    use ::libc::{self, c_int};
 
     pub struct QuotaCmd(pub QuotaSubCmd, pub QuotaType);
     pub type QuotaSubCmd = c_int;
@@ -71,7 +71,7 @@ pub mod quota {
 }
 
 mod ffi {
-    use libc::{c_int, c_char};
+    use ::libc::{c_int, c_char};
 
     extern {
         pub fn quotactl(cmd: c_int, special: * const c_char, id: c_int, data: *mut c_char) -> c_int;
@@ -83,7 +83,7 @@ use std::ptr;
 fn quotactl<P: ?Sized + NixPath>(cmd: quota::QuotaCmd, special: Option<&P>, id: c_int, addr: *mut c_char) -> Result<()> {
     unsafe {
         Errno::clear();
-        let res = try!(
+        let res = try_new!(
             match special {
                 Some(dev) => dev.with_nix_path(|path| ffi::quotactl(cmd.as_int(), path.as_ptr(), id, addr)),
                 None => Ok(ffi::quotactl(cmd.as_int(), ptr::null(), id, addr)),
@@ -95,7 +95,7 @@ fn quotactl<P: ?Sized + NixPath>(cmd: quota::QuotaCmd, special: Option<&P>, id: 
 }
 
 pub fn quotactl_on<P: ?Sized + NixPath>(which: quota::QuotaType, special: &P, format: quota::QuotaFmt, quota_file: &P) -> Result<()> {
-    try!(quota_file.with_nix_path(|path| {
+    try_new!(quota_file.with_nix_path(|path| {
         let mut path_copy = path.to_bytes_with_nul().to_owned();
         let p: *mut c_char = path_copy.as_mut_ptr() as *mut c_char;
         quotactl(quota::QuotaCmd(quota::Q_QUOTAON, which), Some(special), format as c_int, p)

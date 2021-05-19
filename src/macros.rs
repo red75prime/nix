@@ -101,7 +101,7 @@ macro_rules! libc_bitflags {
             type: $T:ty,
             attrs: $attrs:tt,
         },
-        $flags:tt;
+        [$($flags:tt)*];
     ) => {
         libc_bitflags! {
             @call_bitflags
@@ -110,7 +110,7 @@ macro_rules! libc_bitflags {
                 name: $BitFlags,
                 type: $T,
                 attrs: $attrs,
-                flags: $flags,
+                flags: [$($flags)*],
             }
         }
     };
@@ -119,14 +119,14 @@ macro_rules! libc_bitflags {
     (@accumulate_flags
         $prefix:tt,
         [$($flags:tt)*];
-        #[$attr:meta] $($tail:tt)*
+        #[$( $att:tt )*] $($tail:tt)*
     ) => {
         libc_bitflags! {
             @accumulate_flags
             $prefix,
             [
                 $($flags)*
-                #[$attr]
+                #[$( $att )*]
             ];
             $($tail)*
         }
@@ -418,9 +418,19 @@ macro_rules! libc_enum {
 }
 
 /// A Rust version of the familiar C `offset_of` macro.  It returns the byte
-/// offset of `field` within struct `ty`
+/// offset of `field` within struct reference `e`
 macro_rules! offset_of {
-    ($ty:ty, $field:ident) => {
-        &(*(0 as *const $ty)).$field as *const _ as usize
+    ($ty:ty, $e:expr, $field:ident) => {
+        {
+            let e: &$ty = $e;
+            (&e.$field as *const _ as *const u8).offset_from(e as *const _ as *const u8)
+        }
+    }
+}
+
+/// try_macro patch
+macro_rules! try_new {
+    ($( $all:tt)* ) => {
+        ($( $all)* ?)
     }
 }

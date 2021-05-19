@@ -1,12 +1,12 @@
-use {Error, Errno, Result, NixPath};
-use libc::{self, c_int, c_uint, c_char, size_t, ssize_t};
-use sys::stat::Mode;
+use crate::{Error, Errno, Result, NixPath};
+use ::libc::{self, c_int, c_uint, c_char, size_t, ssize_t};
+use crate::sys::stat::Mode;
 use std::os::unix::io::RawFd;
 use std::ffi::OsStr;
 use std::os::unix::ffi::OsStrExt;
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
-use sys::uio::IoVec;  // For vmsplice
+use crate::sys::uio::IoVec;  // For vmsplice
 
 pub use self::consts::*;
 
@@ -14,7 +14,7 @@ pub use self::consts::*;
 // https://github.com/rust-lang/libc/issues/235 is resolved.
 #[allow(dead_code)]
 mod ffi {
-    use libc::c_int;
+    use ::libc::c_int;
 
     pub const F_ADD_SEALS: c_int = 1033;
     pub const F_GET_SEALS: c_int = 1034;
@@ -27,7 +27,7 @@ libc_bitflags!{
         #[cfg(any(target_os = "linux", target_os = "android"))]
         AT_NO_AUTOMOUNT,
         #[cfg(any(target_os = "linux", target_os = "android"))]
-        AT_EMPTY_PATH
+        AT_EMPTY_PATH,
     }
 }
 
@@ -40,7 +40,7 @@ bitflags!(
 );
 
 pub fn open<P: ?Sized + NixPath>(path: &P, oflag: OFlag, mode: Mode) -> Result<RawFd> {
-    let fd = try!(path.with_nix_path(|cstr| {
+    let fd = try_new!(path.with_nix_path(|cstr| {
         unsafe { libc::open(cstr.as_ptr(), oflag.bits(), mode.bits() as c_uint) }
     }));
 
@@ -48,7 +48,7 @@ pub fn open<P: ?Sized + NixPath>(path: &P, oflag: OFlag, mode: Mode) -> Result<R
 }
 
 pub fn openat<P: ?Sized + NixPath>(dirfd: RawFd, path: &P, oflag: OFlag, mode: Mode) -> Result<RawFd> {
-    let fd = try!(path.with_nix_path(|cstr| {
+    let fd = try_new!(path.with_nix_path(|cstr| {
         unsafe { libc::openat(dirfd, cstr.as_ptr(), oflag.bits(), mode.bits() as c_uint) }
     }));
     Errno::result(fd)
@@ -69,7 +69,7 @@ fn wrap_readlink_result<'a>(buffer: &'a mut[u8], res: ssize_t)
 }
 
 pub fn readlink<'a, P: ?Sized + NixPath>(path: &P, buffer: &'a mut [u8]) -> Result<&'a OsStr> {
-    let res = try!(path.with_nix_path(|cstr| {
+    let res = try_new!(path.with_nix_path(|cstr| {
         unsafe { libc::readlink(cstr.as_ptr(), buffer.as_mut_ptr() as *mut c_char, buffer.len() as size_t) }
     }));
 
@@ -78,7 +78,7 @@ pub fn readlink<'a, P: ?Sized + NixPath>(path: &P, buffer: &'a mut [u8]) -> Resu
 
 
 pub fn readlinkat<'a, P: ?Sized + NixPath>(dirfd: RawFd, path: &P, buffer: &'a mut [u8]) -> Result<&'a OsStr> {
-    let res = try!(path.with_nix_path(|cstr| {
+    let res = try_new!(path.with_nix_path(|cstr| {
         unsafe { libc::readlinkat(dirfd, cstr.as_ptr(), buffer.as_mut_ptr() as *mut c_char, buffer.len() as size_t) }
     }));
 
@@ -200,8 +200,8 @@ pub fn vmsplice(fd: RawFd, iov: &[IoVec<&[u8]>], flags: SpliceFFlags) -> Result<
 }
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
-mod consts {
-    use libc::{self, c_int, c_uint};
+pub mod consts {
+    use ::libc::{self, c_int, c_uint};
 
     libc_bitflags! {
         pub flags SpliceFFlags: c_uint {
@@ -212,35 +212,65 @@ mod consts {
         }
     }
 
-    bitflags!(
-        pub struct OFlag: c_int {
-            const O_ACCMODE   = libc::O_ACCMODE;
-            const O_RDONLY    = libc::O_RDONLY;
-            const O_WRONLY    = libc::O_WRONLY;
-            const O_RDWR      = libc::O_RDWR;
-            const O_CREAT     = libc::O_CREAT;
-            const O_EXCL      = libc::O_EXCL;
-            const O_NOCTTY    = libc::O_NOCTTY;
-            const O_TRUNC     = libc::O_TRUNC;
-            const O_APPEND    = libc::O_APPEND;
-            const O_NONBLOCK  = libc::O_NONBLOCK;
-            const O_DSYNC     = libc::O_DSYNC;
-            const O_DIRECT    = libc::O_DIRECT;
-            const O_LARGEFILE = 0o00100000;
-            const O_DIRECTORY = libc::O_DIRECTORY;
-            const O_NOFOLLOW  = libc::O_NOFOLLOW;
-            const O_NOATIME   = 0o01000000;
-            const O_CLOEXEC   = libc::O_CLOEXEC;
-            const O_SYNC      = libc::O_SYNC;
-            const O_PATH      = 0o10000000;
-            const O_TMPFILE   = libc::O_TMPFILE;
-            const O_NDELAY    = libc::O_NDELAY;
+    cfg_if! {
+        if #[cfg(not(target_env = "uclibc"))] {
+            bitflags!(
+                pub struct OFlag: c_int {
+                    const O_ACCMODE   = libc::O_ACCMODE;
+                    const O_RDONLY    = libc::O_RDONLY;
+                    const O_WRONLY    = libc::O_WRONLY;
+                    const O_RDWR      = libc::O_RDWR;
+                    const O_CREAT     = libc::O_CREAT;
+                    const O_EXCL      = libc::O_EXCL;
+                    const O_NOCTTY    = libc::O_NOCTTY;
+                    const O_TRUNC     = libc::O_TRUNC;
+                    const O_APPEND    = libc::O_APPEND;
+                    const O_NONBLOCK  = libc::O_NONBLOCK;
+                    const O_DSYNC     = libc::O_DSYNC;
+                    const O_DIRECT    = libc::O_DIRECT;
+                    const O_LARGEFILE = 0o00100000;
+                    const O_DIRECTORY = libc::O_DIRECTORY;
+                    const O_NOFOLLOW  = libc::O_NOFOLLOW;
+                    const O_NOATIME   = 0o01000000;
+                    const O_CLOEXEC   = libc::O_CLOEXEC;
+                    const O_SYNC      = libc::O_SYNC;
+                    const O_PATH      = 0o10000000;
+                    const O_TMPFILE   = libc::O_TMPFILE;
+                    const O_NDELAY    = libc::O_NDELAY;
+                }
+            );
+        } else { // uclibc
+            bitflags!(
+                pub struct OFlag: c_int {
+                    const O_ACCMODE   = libc::O_ACCMODE;
+                    const O_RDONLY    = libc::O_RDONLY;
+                    const O_WRONLY    = libc::O_WRONLY;
+                    const O_RDWR      = libc::O_RDWR;
+                    const O_CREAT     = libc::O_CREAT;
+                    const O_EXCL      = libc::O_EXCL;
+                    const O_NOCTTY    = libc::O_NOCTTY;
+                    const O_TRUNC     = libc::O_TRUNC;
+                    const O_APPEND    = libc::O_APPEND;
+                    const O_NONBLOCK  = libc::O_NONBLOCK;
+                    const O_DSYNC     = libc::O_DSYNC;
+                    const O_DIRECT    = libc::O_DIRECT;
+                    const O_LARGEFILE = 0o00100000;
+                    const O_DIRECTORY = libc::O_DIRECTORY;
+                    const O_NOFOLLOW  = libc::O_NOFOLLOW;
+                    const O_NOATIME   = 0o01000000;
+                    const O_CLOEXEC   = libc::O_CLOEXEC;
+                    const O_SYNC      = libc::O_SYNC;
+                    const O_PATH      = 0o10000000;
+                    const O_TMPFILE   = 0o20000000 | libc::O_DIRECTORY;
+                    const O_NDELAY    = libc::O_NDELAY;
+                }
+            );
         }
-    );
+    }
 
-    libc_bitflags!(
-        pub flags FdFlag: c_int {
-            FD_CLOEXEC
+    bitflags!(
+        pub struct  FdFlag: c_int {
+            const FD_CLOEXEC = libc::FD_CLOEXEC;
         }
     );
 
@@ -258,7 +288,7 @@ mod consts {
 #[cfg(any(target_os = "netbsd", target_os = "dragonfly", target_os = "openbsd",
           target_os = "freebsd", target_os = "macos", target_os = "ios"))]
 mod consts {
-    use libc::{self,c_int};
+    use ::libc::{self,c_int};
 
     libc_bitflags!(
         pub flags OFlag: c_int {

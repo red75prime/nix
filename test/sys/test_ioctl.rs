@@ -207,7 +207,7 @@ mod linux_ioctls {
     use std::os::unix::io::AsRawFd;
 
     use tempfile::tempfile;
-    use libc::{TCGETS, TCSBRK, TCSETS, TIOCNXCL, termios};
+    use ::libc::{TCGETS, TCSBRK, TCSETS, TIOCNXCL, termios};
 
     use nix::Error::Sys;
     use nix::errno::{ENOTTY, ENOSYS};
@@ -342,7 +342,7 @@ mod freebsd_ioctls {
     use std::os::unix::io::AsRawFd;
 
     use tempfile::tempfile;
-    use libc::termios;
+    use ::libc::termios;
 
     use nix::Error::Sys;
     use nix::errno::ENOTTY;

@@ -6,7 +6,7 @@ use nix::mqueue::MqAttr;
 use nix::sys::stat::{S_IWUSR, S_IRUSR, S_IRGRP, S_IROTH};
 use std::ffi::CString;
 use std::str;
-use libc::c_long;
+use ::libc::c_long;
 
 use nix::errno::Errno::*;
 use nix::Error::Sys;

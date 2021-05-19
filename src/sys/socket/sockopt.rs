@@ -1,9 +1,9 @@
 use super::{ffi, consts, GetSockOpt, SetSockOpt};
-use {Errno, Result};
-use sys::time::TimeVal;
-use libc::{c_int, uint8_t, c_void, socklen_t};
+use crate::{Errno, Result};
+use crate::sys::time::TimeVal;
+use ::libc::{c_int, c_void, socklen_t};
 #[cfg(target_os = "linux")]
-use libc::sockaddr_in;
+use ::libc::sockaddr_in;
 use std::mem;
 use std::os::unix::io::RawFd;
 
@@ -38,7 +38,7 @@ macro_rules! getsockopt_impl {
                     let res = ffi::getsockopt(fd, $level, $flag,
                                               getter.ffi_ptr(),
                                               getter.ffi_len());
-                    try!(Errno::result(res));
+                    try_new!(Errno::result(res));
 
                     Ok(getter.unwrap())
                 }
@@ -288,14 +288,14 @@ impl<'a> Set<'a, bool> for SetBool {
 
 struct GetU8 {
     len: socklen_t,
-    val: uint8_t,
+    val: u8,
 }
 
 impl Get<u8> for GetU8 {
     unsafe fn blank() -> Self {
         GetU8 {
-            len: mem::size_of::<uint8_t>() as socklen_t,
-            val: mem::zeroed(),
+            len: mem::size_of::<u8>() as socklen_t,
+            val: 0,
         }
     }
 
@@ -308,18 +308,18 @@ impl Get<u8> for GetU8 {
     }
 
     unsafe fn unwrap(self) -> u8 {
-        assert!(self.len as usize == mem::size_of::<uint8_t>(), "invalid getsockopt implementation");
+        assert!(self.len as usize == mem::size_of::<u8>(), "invalid getsockopt implementation");
         self.val as u8
     }
 }
 
 struct SetU8 {
-    val: uint8_t,
+    val: u8,
 }
 
 impl<'a> Set<'a, u8> for SetU8 {
     fn new(val: &'a u8) -> SetU8 {
-        SetU8 { val: *val as uint8_t }
+        SetU8 { val: *val }
     }
 
     unsafe fn ffi_ptr(&self) -> *const c_void {
@@ -393,7 +393,7 @@ mod test {
     #[test]
     fn is_socket_type_unix() {
         use super::super::*;
-        use ::unistd::close;
+        use crate::unistd::close;
 
         let (a, b) = socketpair(AddressFamily::Unix, SockType::Stream, 0, SockFlag::empty()).unwrap();
         let a_type = getsockopt(a, super::SockType).unwrap();
@@ -405,7 +405,7 @@ mod test {
     #[test]
     fn is_socket_type_dgram() {
         use super::super::*;
-        use ::unistd::close;
+        use crate::unistd::close;
 
         let s = socket(AddressFamily::Inet, SockType::Datagram, SockFlag::empty(), 0).unwrap();
         let s_type = getsockopt(s, super::SockType).unwrap();
@@ -419,7 +419,7 @@ mod test {
     #[test]
     fn can_get_listen_on_tcp_socket() {
         use super::super::*;
-        use ::unistd::close;
+        use crate::unistd::close;
 
         let s = socket(AddressFamily::Inet, SockType::Stream, SockFlag::empty(), 0).unwrap();
         let s_listening = getsockopt(s, super::AcceptConn).unwrap();

@@ -1,9 +1,9 @@
 use std::mem;
 use std::os::unix::io::RawFd;
 use std::option::Option;
-use libc::{self, c_int, c_void};
-use {Errno, Error, Result};
-use ::unistd::Pid;
+use ::libc::{self, c_int, c_void};
+use crate::{Errno, Error, Result};
+use crate::unistd::Pid;
 
 // For some functions taking with a parameter of type CloneFlags,
 // only a subset of these flags have an effect.
@@ -25,6 +25,7 @@ libc_bitflags!{
         CLONE_DETACHED,
         CLONE_UNTRACED,
         CLONE_CHILD_SETTID,
+        #[cfg(not(target_env = "uclibc"))]
         CLONE_NEWCGROUP,
         CLONE_NEWUTS,
         CLONE_NEWIPC,
@@ -35,7 +36,7 @@ libc_bitflags!{
     }
 }
 
-pub type CloneCb<'a> = Box<FnMut() -> isize + 'a>;
+pub type CloneCb<'a> = Box<dyn FnMut() -> isize + 'a>;
 
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -74,7 +75,7 @@ impl CpuSet {
 }
 
 mod ffi {
-    use libc::{c_void, c_int};
+    use ::libc::{c_void, c_int};
 
     pub type CloneCb = extern "C" fn(data: *const super::CloneCb) -> c_int;
 
@@ -116,7 +117,7 @@ pub fn clone(mut cb: CloneCb,
         let combined = flags.bits() | signal.unwrap_or(0);
         let ptr = stack.as_mut_ptr().offset(stack.len() as isize);
         let ptr_aligned = ptr.offset((ptr as usize % 16) as isize * -1);
-        ffi::clone(mem::transmute(callback as extern "C" fn(*mut Box<::std::ops::FnMut() -> isize>) -> i32),
+        ffi::clone(mem::transmute(callback as extern "C" fn(*mut Box<dyn ::std::ops::FnMut() -> isize>) -> i32),
                    ptr_aligned as *mut c_void,
                    combined,
                    &mut cb)

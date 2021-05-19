@@ -1,16 +1,16 @@
 use super::{consts, sa_family_t};
-use {Errno, Error, Result, NixPath};
-use libc;
+use crate::{Errno, Error, Result, NixPath};
+use ::libc;
 use std::{fmt, hash, mem, net, ptr};
 use std::ffi::OsStr;
 use std::path::Path;
 use std::os::unix::ffi::OsStrExt;
 #[cfg(any(target_os = "linux", target_os = "android"))]
-use ::sys::socket::addr::netlink::NetlinkAddr;
+use crate::sys::socket::addr::netlink::NetlinkAddr;
 #[cfg(any(target_os = "macos", target_os = "ios"))]
 use std::os::unix::io::RawFd;
 #[cfg(any(target_os = "macos", target_os = "ios"))]
-use ::sys::socket::addr::sys_control::SysControlAddr;
+use crate::sys::socket::addr::sys_control::SysControlAddr;
 
 // TODO: uncomment out IpAddr functions: rust-lang/rfcs#988
 
@@ -321,9 +321,9 @@ macro_rules! to_u16_array {
 
 impl Ipv6Addr {
     pub fn new(a: u16, b: u16, c: u16, d: u16, e: u16, f: u16, g: u16, h: u16) -> Ipv6Addr {
-        let mut in6_addr_var: libc::in6_addr = unsafe{mem::uninitialized()};
-        in6_addr_var.s6_addr = to_u8_array!(a,b,c,d,e,f,g,h);
-        Ipv6Addr(in6_addr_var)
+        Ipv6Addr(libc::in6_addr {
+            s6_addr: to_u8_array!(a,b,c,d,e,f,g,h),
+        })
     }
 
     pub fn from_std(std: &net::Ipv6Addr) -> Ipv6Addr {
@@ -366,7 +366,7 @@ pub struct UnixAddr(pub libc::sockaddr_un, pub usize);
 impl UnixAddr {
     /// Create a new sockaddr_un representing a filesystem path.
     pub fn new<P: ?Sized + NixPath>(path: &P) -> Result<UnixAddr> {
-        try!(path.with_nix_path(|cstr| {
+        try_new!(path.with_nix_path(|cstr| {
             unsafe {
                 let mut ret = libc::sockaddr_un {
                     sun_family: AddressFamily::Unix as sa_family_t,
@@ -492,7 +492,7 @@ impl SockAddr {
     }
 
     pub fn new_unix<P: ?Sized + NixPath>(path: &P) -> Result<SockAddr> {
-        Ok(SockAddr::Unix(try!(UnixAddr::new(path))))
+        Ok(SockAddr::Unix(try_new!(UnixAddr::new(path))))
     }
 
     #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -525,7 +525,11 @@ impl SockAddr {
         match *self {
             SockAddr::Inet(InetAddr::V4(ref addr)) => (mem::transmute(addr), mem::size_of::<libc::sockaddr_in>() as libc::socklen_t),
             SockAddr::Inet(InetAddr::V6(ref addr)) => (mem::transmute(addr), mem::size_of::<libc::sockaddr_in6>() as libc::socklen_t),
-            SockAddr::Unix(UnixAddr(ref addr, len)) => (mem::transmute(addr), (len + offset_of!(libc::sockaddr_un, sun_path)) as libc::socklen_t),
+            SockAddr::Unix(UnixAddr(ref addr, len)) => {
+                let len = (len + offset_of!(libc::sockaddr_un, addr, sun_path) as usize) as libc::socklen_t;
+                let addr = mem::transmute::<&libc::sockaddr_un, &libc::sockaddr>(addr);
+                (addr, len)
+            },
             #[cfg(any(target_os = "linux", target_os = "android"))]
             SockAddr::Netlink(NetlinkAddr(ref sa)) => (mem::transmute(sa), mem::size_of::<libc::sockaddr_nl>() as libc::socklen_t),
             #[cfg(any(target_os = "macos", target_os = "ios"))]
@@ -589,8 +593,8 @@ impl fmt::Display for SockAddr {
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
 pub mod netlink {
-    use ::sys::socket::addr::{AddressFamily};
-    use libc::{sa_family_t, sockaddr_nl};
+    use crate::sys::socket::addr::{AddressFamily};
+    use ::libc::{sa_family_t, sockaddr_nl};
     use std::{fmt, mem};
     use std::hash::{Hash, Hasher};
 
@@ -644,13 +648,13 @@ pub mod netlink {
 
 #[cfg(any(target_os = "macos", target_os = "ios"))]
 pub mod sys_control {
-    use ::sys::socket::consts;
-    use ::sys::socket::addr::{AddressFamily};
-    use libc::{c_uchar, uint16_t, uint32_t};
+    use crate::sys::socket::consts;
+    use crate::sys::socket::addr::{AddressFamily};
+    use ::libc::{c_uchar, uint16_t, uint32_t};
     use std::{fmt, mem};
     use std::hash::{Hash, Hasher};
     use std::os::unix::io::RawFd;
-    use {Errno, Error, Result};
+    use crate::{Errno, Error, Result};
 
     #[repr(C)]
     pub struct ctl_ioc_info {
@@ -720,7 +724,7 @@ pub mod sys_control {
             ctl_name[..name.len()].clone_from_slice(name.as_bytes());
             let mut info = ctl_ioc_info { ctl_id: 0, ctl_name: ctl_name };
 
-            unsafe { try!(ctl_info(sockfd, &mut info)); }
+            unsafe { try_new!(ctl_info(sockfd, &mut info)); }
 
             Ok(SysControlAddr::new(info.ctl_id, unit))
         }

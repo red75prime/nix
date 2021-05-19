@@ -1,8 +1,8 @@
 use std::ptr::null_mut;
 use std::os::unix::io::RawFd;
-use libc::{c_int, timeval};
-use {Errno, Result};
-use sys::time::TimeVal;
+use ::libc::{c_int, timeval};
+use crate::{Errno, Result};
+use crate::sys::time::TimeVal;
 
 pub const FD_SETSIZE: RawFd = 1024;
 
@@ -56,7 +56,7 @@ impl FdSet {
 }
 
 mod ffi {
-    use libc::{c_int, timeval};
+    use ::libc::{c_int, timeval};
     use super::FdSet;
 
     extern {

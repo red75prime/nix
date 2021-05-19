@@ -1,8 +1,8 @@
 // Portions of this file are Copyright 2014 The Rust Project Developers.
 // See http://rust-lang.org/COPYRIGHT.
 
-use libc;
-use {Errno, Error, Result};
+use ::libc;
+use crate::{Errno, Error, Result};
 use std::fmt;
 use std::fmt::Debug;
 use std::mem;
@@ -198,45 +198,59 @@ pub const SIGIOT : Signal = SIGABRT;
 pub const SIGPOLL : Signal = SIGIO;
 pub const SIGUNUSED : Signal = SIGSYS;
 
-#[cfg(not(target_os = "android"))]
-libc_bitflags!{
-    pub flags SaFlags: libc::c_int {
-        SA_NOCLDSTOP,
-        SA_NOCLDWAIT,
-        SA_NODEFER,
-        SA_ONSTACK,
-        SA_RESETHAND,
-        SA_RESTART,
-        SA_SIGINFO,
-    }
-}
-
-// On 64-bit android, sa_flags is c_uint while on 32-bit android, it is
-// c_ulong.
-// FIXME: https://github.com/rust-lang/libc/pull/511
-#[cfg(all(target_os = "android", target_pointer_width = "32"))]
-libc_bitflags!{
-    pub flags SaFlags: libc::c_ulong {
-        SA_NOCLDSTOP as libc::c_ulong,
-        SA_NOCLDWAIT as libc::c_ulong,
-        SA_NODEFER as libc::c_ulong,
-        SA_ONSTACK as libc::c_ulong,
-        SA_RESETHAND as libc::c_ulong,
-        SA_RESTART as libc::c_ulong,
-        SA_SIGINFO as libc::c_ulong,
-    }
-}
-
-#[cfg(all(target_os = "android", target_pointer_width = "64"))]
-libc_bitflags!{
-    pub flags SaFlags: libc::c_uint {
-        SA_NOCLDSTOP as libc::c_uint,
-        SA_NOCLDWAIT as libc::c_uint,
-        SA_NODEFER as libc::c_uint,
-        SA_ONSTACK as libc::c_uint,
-        SA_RESETHAND as libc::c_uint,
-        SA_RESTART as libc::c_uint,
-        SA_SIGINFO as libc::c_uint,
+cfg_if! {
+    // On 64-bit android, sa_flags is c_uint while on 32-bit android, it is
+    // c_ulong.
+    // FIXME: https://github.com/rust-lang/libc/pull/511
+    if #[cfg(all(target_os = "android", target_pointer_width = "32"))] {
+        libc_bitflags!{
+            pub flags SaFlags: libc::c_ulong {
+                pub SA_NOCLDSTOP as libc::c_ulong,
+                SA_NOCLDWAIT as libc::c_ulong,
+                SA_NODEFER as libc::c_ulong,
+                SA_ONSTACK as libc::c_ulong,
+                SA_RESETHAND as libc::c_ulong,
+                SA_RESTART as libc::c_ulong,
+                SA_SIGINFO as libc::c_ulong,
+            }
+        }
+    } else if #[cfg(all(target_os = "android", target_pointer_width = "64"))] {
+        libc_bitflags!{
+            pub flags SaFlags: libc::c_uint {
+                SA_NOCLDSTOP as libc::c_uint,
+                SA_NOCLDWAIT as libc::c_uint,
+                SA_NODEFER as libc::c_uint,
+                SA_ONSTACK as libc::c_uint,
+                SA_RESETHAND as libc::c_uint,
+                SA_RESTART as libc::c_uint,
+                SA_SIGINFO as libc::c_uint,
+            }
+        }
+    } else if #[cfg(target_env = "uclibc")] {
+        libc_bitflags!{
+            pub flags SaFlags: libc::c_uint {
+                SA_NOCLDSTOP,
+                SA_NOCLDWAIT,
+                SA_NODEFER,
+                SA_ONSTACK,
+                SA_RESETHAND,
+                SA_RESTART,
+                SA_SIGINFO,
+            }
+        }
+    } else {
+        // all other besides android and uclibc
+        libc_bitflags!{
+            pub flags SaFlags: libc::c_int {
+                SA_NOCLDSTOP,
+                SA_NOCLDWAIT,
+                SA_NODEFER,
+                SA_ONSTACK,
+                SA_RESETHAND,
+                SA_RESTART,
+                SA_SIGINFO,
+            }
+        }
     }
 }
 
@@ -256,17 +270,17 @@ pub struct SigSet {
 
 impl SigSet {
     pub fn all() -> SigSet {
-        let mut sigset: libc::sigset_t = unsafe { mem::uninitialized() };
-        let _ = unsafe { libc::sigfillset(&mut sigset as *mut libc::sigset_t) };
+        let mut sigset = mem::MaybeUninit::<libc::sigset_t>::uninit();
+        let _ = unsafe { libc::sigfillset(sigset.as_mut_ptr()) };
 
-        SigSet { sigset: sigset }
+        SigSet { sigset: unsafe { sigset.assume_init() } }
     }
 
     pub fn empty() -> SigSet {
-        let mut sigset: libc::sigset_t = unsafe { mem::uninitialized() };
-        let _ = unsafe { libc::sigemptyset(&mut sigset as *mut libc::sigset_t) };
+        let mut sigset = mem::MaybeUninit::<libc::sigset_t>::uninit();
+        let _ = unsafe { libc::sigemptyset(sigset.as_mut_ptr()) };
 
-        SigSet { sigset: sigset }
+        SigSet { sigset: unsafe{ sigset.assume_init() } }
     }
 
     pub fn add(&mut self, signal: Signal) {
@@ -301,9 +315,11 @@ impl SigSet {
 
     /// Gets the currently blocked (masked) set of signals for the calling thread.
     pub fn thread_get_mask() -> Result<SigSet> {
-        let mut oldmask: SigSet = unsafe { mem::uninitialized() };
-        try!(pthread_sigmask(SigmaskHow::SIG_SETMASK, None, Some(&mut oldmask)));
-        Ok(oldmask)
+        let mut oldmask = mem::MaybeUninit::<libc::sigset_t>::uninit();
+        unsafe {
+            do_pthread_sigmask(SigmaskHow::SIG_SETMASK, None, Some(oldmask.as_mut_ptr()))?;
+            Ok(SigSet { sigset: oldmask.assume_init() })
+        }
     }
 
     /// Sets the set of signals as the signal mask for the calling thread.
@@ -323,15 +339,17 @@ impl SigSet {
 
     /// Sets the set of signals as the signal mask, and returns the old mask.
     pub fn thread_swap_mask(&self, how: SigmaskHow) -> Result<SigSet> {
-        let mut oldmask: SigSet = unsafe { mem::uninitialized() };
-        try!(pthread_sigmask(how, Some(self), Some(&mut oldmask)));
-        Ok(oldmask)
+        let mut oldmask = mem::MaybeUninit::<libc::sigset_t>::uninit();
+        unsafe {
+            do_pthread_sigmask(how, Some(self), Some(oldmask.as_mut_ptr()))?;
+            Ok(SigSet { sigset: oldmask.assume_init() })
+        }
     }
 
     /// Suspends execution of the calling thread until one of the signals in the
     /// signal mask becomes pending, and returns the accepted signal.
     pub fn wait(&self) -> Result<Signal> {
-        let mut signum: libc::c_int = unsafe { mem::uninitialized() };
+        let mut signum: libc::c_int = 0;
         let res = unsafe { libc::sigwait(&self.sigset as *const libc::sigset_t, &mut signum) };
 
         Errno::result(res).map(|_| Signal::from_c_int(signum).unwrap())
@@ -361,20 +379,25 @@ impl SigAction {
     /// This function will set or unset the flag `SA_SIGINFO` depending on the
     /// type of the `handler` argument.
     pub fn new(handler: SigHandler, flags: SaFlags, mask: SigSet) -> SigAction {
-        let mut s = unsafe { mem::uninitialized::<libc::sigaction>() };
-        s.sa_sigaction = match handler {
-            SigHandler::SigDfl => unsafe { mem::transmute(libc::SIG_DFL) },
-            SigHandler::SigIgn => unsafe { mem::transmute(libc::SIG_IGN) },
-            SigHandler::Handler(f) => unsafe { mem::transmute(f) },
-            SigHandler::SigAction(f) => unsafe { mem::transmute(f) },
-        };
-        s.sa_flags = match handler {
-            SigHandler::SigAction(_) => (flags | SA_SIGINFO).bits(),
-            _ => (flags - SA_SIGINFO).bits(),
-        };
-        s.sa_mask = mask.sigset;
+        use std::ptr::addr_of_mut;
 
-        SigAction { sigaction: s }
+        let mut s = mem::MaybeUninit::<libc::sigaction>::uninit();
+        let ptr = s.as_mut_ptr();
+        unsafe {
+            addr_of_mut!((*ptr).sa_sigaction).write(match handler {
+                SigHandler::SigDfl => mem::transmute(libc::SIG_DFL),
+                SigHandler::SigIgn => mem::transmute(libc::SIG_IGN),
+                SigHandler::Handler(f) => mem::transmute(f),
+                SigHandler::SigAction(f) => mem::transmute(f),
+            });
+            addr_of_mut!((*ptr).sa_flags).write(match handler {
+                SigHandler::SigAction(_) => (flags | SaFlags::SA_SIGINFO).bits(),
+                _ => (flags - SaFlags::SA_SIGINFO).bits(),
+            });
+            addr_of_mut!((*ptr).sa_mask).write(mask.sigset);
+
+            SigAction { sigaction: s.assume_init() }
+        }
     }
 
     pub fn flags(&self) -> SaFlags {
@@ -389,7 +412,7 @@ impl SigAction {
         match self.sigaction.sa_sigaction {
             libc::SIG_DFL => SigHandler::SigDfl,
             libc::SIG_IGN => SigHandler::SigIgn,
-            f if self.flags().contains(SA_SIGINFO) =>
+            f if self.flags().contains(SaFlags::SA_SIGINFO) =>
                 SigHandler::SigAction( unsafe { mem::transmute(f) } ),
             f => SigHandler::Handler( unsafe { mem::transmute(f) } ),
         }
@@ -397,12 +420,31 @@ impl SigAction {
 }
 
 pub unsafe fn sigaction(signal: Signal, sigaction: &SigAction) -> Result<SigAction> {
-    let mut oldact = mem::uninitialized::<libc::sigaction>();
+    let mut oldact = mem::MaybeUninit::<libc::sigaction>::uninit();
 
     let res =
-        libc::sigaction(signal as libc::c_int, &sigaction.sigaction as *const libc::sigaction, &mut oldact as *mut libc::sigaction);
+        libc::sigaction(signal as libc::c_int, &sigaction.sigaction as *const libc::sigaction, oldact.as_mut_ptr());
 
-    Errno::result(res).map(|_| SigAction { sigaction: oldact })
+    Errno::result(res).map(|_| SigAction { sigaction: oldact.assume_init() })
+}
+
+unsafe fn do_pthread_sigmask(how: SigmaskHow,
+    set: Option<&SigSet>,
+    oldset: Option<*mut libc::sigset_t>) -> Result<()>
+{
+    if set.is_none() && oldset.is_none() {
+        return Ok(())
+    }
+
+    let res =
+        // if set or oldset is None, pass in null pointers instead
+        libc::pthread_sigmask(how as libc::c_int,
+                set.map_or_else(ptr::null::<libc::sigset_t>,
+                                |s| &s.sigset as *const libc::sigset_t),
+                oldset.unwrap_or(ptr::null_mut())
+                );
+
+    Errno::result(res).map(drop)
 }
 
 /// Manages the signal mask (set of blocked signals) for the calling thread.
@@ -423,23 +465,12 @@ pub unsafe fn sigaction(signal: Signal, sigaction: &SigAction) -> Result<SigActi
 pub fn pthread_sigmask(how: SigmaskHow,
                        set: Option<&SigSet>,
                        oldset: Option<&mut SigSet>) -> Result<()> {
-    if set.is_none() && oldset.is_none() {
-        return Ok(())
+    unsafe {
+        do_pthread_sigmask(how, set, oldset.map(|os| &mut os.sigset as *mut _ ))
     }
-
-    let res = unsafe {
-        // if set or oldset is None, pass in null pointers instead
-        libc::pthread_sigmask(how as libc::c_int,
-                             set.map_or_else(|| ptr::null::<libc::sigset_t>(),
-                                             |s| &s.sigset as *const libc::sigset_t),
-                             oldset.map_or_else(|| ptr::null_mut::<libc::sigset_t>(),
-                                                |os| &mut os.sigset as *mut libc::sigset_t))
-    };
-
-    Errno::result(res).map(drop)
 }
 
-pub fn kill<T: Into<Option<Signal>>>(pid: ::unistd::Pid, signal: T) -> Result<()> {
+pub fn kill<T: Into<Option<Signal>>>(pid: crate::unistd::Pid, signal: T) -> Result<()> {
     let res = unsafe { libc::kill(pid.into(),
                                   match signal.into() {
                                       Some(s) => s as libc::c_int,
@@ -689,7 +720,7 @@ mod tests {
 
     #[test]
     fn test_sigaction() {
-        use libc;
+        use ::libc;
 
         extern fn test_sigaction_handler(_: libc::c_int) {}
         extern fn test_sigaction_action(_: libc::c_int,
@@ -697,7 +728,7 @@ mod tests {
 
         let handler_sig = SigHandler::Handler(test_sigaction_handler);
 
-        let flags = SA_ONSTACK | SA_RESTART | SA_SIGINFO;
+        let flags = SaFlags::SA_ONSTACK | SaFlags::SA_RESTART | SaFlags::SA_SIGINFO;
 
         let mut mask = SigSet::empty();
         mask.add(SIGUSR1);

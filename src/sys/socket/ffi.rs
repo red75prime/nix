@@ -1,14 +1,14 @@
 // Silence invalid warnings due to rust-lang/rust#16719
 #![allow(improper_ctypes)]
 
-pub use libc::{socket, listen, bind, accept, connect, setsockopt, sendto, recvfrom, getsockname, getpeername, recv, send};
+pub use ::libc::{socket, listen, bind, accept, connect, setsockopt, sendto, recvfrom, getsockname, getpeername, recv, send};
 
-use libc::{c_int, c_void, socklen_t, size_t, ssize_t};
+use ::libc::{c_int, c_void, socklen_t, size_t, ssize_t};
 
 #[cfg(target_os = "macos")]
-use libc::c_uint;
+use ::libc::c_uint;
 
-use sys::uio::IoVec;
+use crate::sys::uio::IoVec;
 
 #[cfg(target_os = "linux")]
 pub type type_of_cmsg_len = size_t;

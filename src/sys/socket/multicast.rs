@@ -1,5 +1,5 @@
 use super::addr::{Ipv4Addr, Ipv6Addr};
-use libc::{in_addr, in6_addr, c_uint};
+use ::libc::{in_addr, in6_addr, c_uint};
 use std::fmt;
 
 #[repr(C)]

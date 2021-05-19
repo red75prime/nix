@@ -1,11 +1,11 @@
-use libc::{self, c_int};
-use {Errno, Result};
-use unistd::Pid;
+use ::libc::{self, c_int};
+use crate::{Errno, Result};
+use crate::unistd::Pid;
 
-use sys::signal::Signal;
+use crate::sys::signal::Signal;
 
 mod ffi {
-    use libc::{pid_t, c_int};
+    use ::libc::{pid_t, c_int};
 
     extern {
         pub fn waitpid(pid: pid_t, status: *mut c_int, options: c_int) -> pid_t;
@@ -38,7 +38,7 @@ libc_bitflags!(
 
 #[cfg(any(target_os = "linux",
           target_os = "android"))]
-const WSTOPPED: WaitPidFlag = WUNTRACED;
+const WSTOPPED: WaitPidFlag = WaitPidFlag::WUNTRACED;
 
 /// Possible return values from `wait()` or `waitpid()`.
 ///
@@ -96,9 +96,9 @@ pub enum WaitStatus {
 #[cfg(any(target_os = "linux",
           target_os = "android"))]
 mod status {
-    use sys::signal::Signal;
-    use libc::c_int;
-    use libc::SIGTRAP;
+    use crate::sys::signal::Signal;
+    use ::libc::c_int;
+    use ::libc::SIGTRAP;
 
     pub fn exited(status: i32) -> bool {
         (status & 0x7F) == 0
@@ -150,7 +150,7 @@ mod status {
 #[cfg(any(target_os = "macos",
           target_os = "ios"))]
 mod status {
-    use sys::signal::{Signal,SIGCONT};
+    use crate::sys::signal::{Signal,SIGCONT};
 
     const WCOREFLAG: i32 = 0x80;
     const WSTOPPED: i32 = 0x7f;
@@ -197,7 +197,7 @@ mod status {
           target_os = "dragonfly",
           target_os = "netbsd"))]
 mod status {
-    use sys::signal::Signal;
+    use crate::sys::signal::Signal;
 
     const WCOREFLAG: i32 = 0x80;
     const WSTOPPED: i32 = 0x7f;
@@ -282,7 +282,7 @@ pub fn waitpid<P: Into<Option<Pid>>>(pid: P, options: Option<WaitPidFlag>) -> Re
 
     let res = unsafe { ffi::waitpid(pid.into().unwrap_or(Pid::from_raw(-1)).into(), &mut status as *mut c_int, option_bits) };
 
-    Ok(match try!(Errno::result(res)) {
+    Ok(match try_new!(Errno::result(res)) {
         0 => StillAlive,
         res => decode(Pid::from_raw(res), status),
     })

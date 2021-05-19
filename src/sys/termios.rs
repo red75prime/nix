@@ -43,14 +43,14 @@
 //! termios.control_flags |= CS5;
 //! ```
 
-use {Errno, Result};
-use libc::{self, c_int, tcflag_t};
+use crate::{Errno, Result};
+use ::libc::{self, c_int, tcflag_t};
 use std::cell::{Ref, RefCell};
 use std::convert::From;
 use std::mem;
 use std::os::unix::io::RawFd;
 
-use ::unistd::Pid;
+use crate::unistd::Pid;
 
 /// Stores settings for the termios API
 ///
@@ -123,22 +123,22 @@ impl Termios {
         self.inner.as_ptr()
     }
 
-    /// Allows for easily creating new Termios structs that will be overwritten with real data.
-    ///
-    /// This should only be used when the inner libc::termios struct will be overwritten before it's
-    /// read.
-    // FIXME: Switch this over to use pub(crate)
-    #[doc(hidden)]
-    pub unsafe fn default_uninit() -> Self {
-        Termios {
-            inner: RefCell::new(mem::uninitialized()),
-            input_flags: InputFlags::empty(),
-            output_flags: OutputFlags::empty(),
-            control_flags: ControlFlags::empty(),
-            local_flags: LocalFlags::empty(),
-            control_chars: [0 as libc::cc_t; NCCS],
-        }
-    }
+    // /// Allows for easily creating new Termios structs that will be overwritten with real data.
+    // ///
+    // /// This should only be used when the inner libc::termios struct will be overwritten before it's
+    // /// read.
+    // // FIXME: Switch this over to use pub(crate)
+    // #[doc(hidden)]
+    // pub unsafe fn default_uninit() -> Self {
+    //     Termios {
+    //         inner: RefCell::new(mem::uninitialized()),
+    //         input_flags: InputFlags::empty(),
+    //         output_flags: OutputFlags::empty(),
+    //         control_flags: ControlFlags::empty(),
+    //         local_flags: LocalFlags::empty(),
+    //         control_chars: [0 as libc::cc_t; NCCS],
+    //     }
+    // }
 
     /// Updates the wrapper values from the internal `libc::termios` data structure.
     #[doc(hidden)]
@@ -257,22 +257,22 @@ libc_enum!{
 impl From<libc::speed_t> for BaudRate {
     fn from(s: libc::speed_t) -> BaudRate {
 
-        use libc::{B0, B50, B75, B110, B134, B150, B200, B300, B600, B1200, B1800, B2400, B4800,
+        use ::libc::{B0, B50, B75, B110, B134, B150, B200, B300, B600, B1200, B1800, B2400, B4800,
                    B9600, B19200, B38400, B57600, B115200, B230400};
         #[cfg(any(target_os = "android", target_os = "linux"))]
-        use libc::{B500000, B576000, B1000000, B1152000, B1500000, B2000000, B2500000, B3000000,
+        use ::libc::{B500000, B576000, B1000000, B1152000, B1500000, B2000000, B2500000, B3000000,
                    B3500000, B4000000};
         #[cfg(any(target_os = "dragonfly",
                   target_os = "freebsd",
                   target_os = "macos",
                   target_os = "netbsd",
                   target_os = "openbsd"))]
-        use libc::{B7200, B14400, B28800, B76800};
+        use ::libc::{B7200, B14400, B28800, B76800};
         #[cfg(any(target_os = "android",
                   target_os = "freebsd",
                   target_os = "linux",
                   target_os = "netbsd"))]
-        use libc::{B460800, B921600};
+        use ::libc::{B460800, B921600};
 
         match s {
             B0 => BaudRate::B0,
@@ -445,14 +445,14 @@ libc_enum! {
     }
 }
 
-pub use libc::NCCS;
+pub use ::libc::NCCS;
 #[cfg(any(target_os = "dragonfly",
           target_os = "freebsd",
           target_os = "linux",
           target_os = "macos",
           target_os = "netbsd",
           target_os = "openbsd"))]
-pub use libc::_POSIX_VDISABLE;
+pub use ::libc::_POSIX_VDISABLE;
 
 libc_bitflags! {
     /// Flags for configuring the input mode of a terminal
@@ -745,6 +745,7 @@ libc_bitflags! {
                   target_os = "openbsd"))]
         ALTWERASE,
         IEXTEN,
+        #[cfg(not(target_env = "uclibc"))]
         EXTPROC,
         TOSTOP,
         FLUSHO,
@@ -833,13 +834,15 @@ pub fn cfsetspeed(termios: &mut Termios, baud: BaudRate) -> Result<()> {
 /// this structure *will not* reconfigure the port, instead the modifications should be done to
 /// the `Termios` structure and then the port should be reconfigured using `tcsetattr()`.
 pub fn tcgetattr(fd: RawFd) -> Result<Termios> {
-    let mut termios: libc::termios = unsafe { mem::uninitialized() };
+    let mut termios = mem::MaybeUninit::<libc::termios>::uninit();
 
-    let res = unsafe { libc::tcgetattr(fd, &mut termios) };
+    let res = unsafe { libc::tcgetattr(fd, termios.as_mut_ptr()) };
 
-    try!(Errno::result(res));
+    Errno::result(res)?;
 
-    Ok(termios.into())
+    unsafe {
+        Ok(termios.assume_init().into())
+    }
 }
 
 /// Set the configuration for a terminal (see

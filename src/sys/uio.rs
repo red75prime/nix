@@ -1,8 +1,8 @@
 // Silence invalid warnings due to rust-lang/rust#16719
 #![allow(improper_ctypes)]
 
-use {Errno, Result};
-use libc::{self, c_int, c_void, size_t, off_t};
+use crate::{Errno, Result};
+use ::libc::{self, c_int, c_void, size_t, off_t};
 use std::marker::PhantomData;
 use std::os::unix::io::RawFd;
 
@@ -18,9 +18,15 @@ pub fn readv(fd: RawFd, iov: &mut [IoVec<&mut [u8]>]) -> Result<usize> {
     Errno::result(res).map(|r| r as usize)
 }
 
+#[cfg(all(target_os = "linux", target_env = "uclibc"))]
+pub type FileOffset = ::libc::off64_t;
+
+#[cfg(all(target_os = "linux", not(target_env = "uclibc")))]
+pub type FileOffset = ::libc::off_t;
+
 #[cfg(target_os = "linux")]
 pub fn pwritev(fd: RawFd, iov: &[IoVec<&[u8]>],
-               offset: off_t) -> Result<usize> {
+               offset: FileOffset) -> Result<usize> {
     let res = unsafe {
         libc::pwritev(fd, iov.as_ptr() as *const libc::iovec, iov.len() as c_int, offset)
     };
@@ -30,7 +36,7 @@ pub fn pwritev(fd: RawFd, iov: &[IoVec<&[u8]>],
 
 #[cfg(target_os = "linux")]
 pub fn preadv(fd: RawFd, iov: &mut [IoVec<&mut [u8]>],
-              offset: off_t) -> Result<usize> {
+              offset: FileOffset) -> Result<usize> {
     let res = unsafe {
         libc::preadv(fd, iov.as_ptr() as *const libc::iovec, iov.len() as c_int, offset)
     };

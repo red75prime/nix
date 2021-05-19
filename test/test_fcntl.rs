@@ -52,7 +52,7 @@ mod linux_android {
     use std::io::prelude::*;
     use std::os::unix::prelude::*;
 
-    use libc::loff_t;
+    use ::libc::loff_t;
 
     use nix::fcntl::{SpliceFFlags, splice, tee, vmsplice};
     use nix::sys::uio::IoVec;

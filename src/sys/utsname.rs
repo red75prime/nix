@@ -1,10 +1,10 @@
 use std::mem;
-use libc::{c_char};
+use ::libc::{c_char};
 use std::ffi::CStr;
 use std::str::from_utf8_unchecked; 
 
 mod ffi {
-    use libc::c_int;
+    use ::libc::c_int;
     use super::UtsName;
 
     extern {
@@ -55,9 +55,9 @@ impl UtsName {
 
 pub fn uname() -> UtsName {
     unsafe {
-        let mut ret: UtsName = mem::uninitialized();
-        ffi::uname(&mut ret as *mut UtsName);
-        ret
+        let mut ret = mem::MaybeUninit::<UtsName>::uninit();
+        ffi::uname(ret.as_mut_ptr());
+        ret.assume_init()
     }
 }
 

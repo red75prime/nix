@@ -3,7 +3,7 @@ use std::os::unix::prelude::*;
 
 use tempfile::tempfile;
 
-use libc::off_t;
+use ::libc::off_t;
 
 use nix::unistd::{close, pipe, read};
 use nix::sys::sendfile::sendfile;

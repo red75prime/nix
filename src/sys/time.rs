@@ -1,5 +1,5 @@
 use std::{cmp, fmt, ops};
-use libc::{c_long, time_t, suseconds_t, timespec, timeval};
+use ::libc::{c_long, time_t, suseconds_t, timespec, timeval};
 
 pub trait TimeValLike: Sized {
     #[inline]
@@ -234,20 +234,20 @@ impl fmt::Display for TimeSpec {
 
         let sec = abs.tv_sec();
 
-        try!(write!(f, "{}", sign));
+        try_new!(write!(f, "{}", sign));
 
         if abs.tv_nsec() == 0 {
             if abs.tv_sec() == 1 {
-                try!(write!(f, "{} second", sec));
+                try_new!(write!(f, "{} second", sec));
             } else {
-                try!(write!(f, "{} seconds", sec));
+                try_new!(write!(f, "{} seconds", sec));
             }
         } else if abs.tv_nsec() % 1_000_000 == 0 {
-            try!(write!(f, "{}.{:03} seconds", sec, abs.tv_nsec() / 1_000_000));
+            try_new!(write!(f, "{}.{:03} seconds", sec, abs.tv_nsec() / 1_000_000));
         } else if abs.tv_nsec() % 1_000 == 0 {
-            try!(write!(f, "{}.{:06} seconds", sec, abs.tv_nsec() / 1_000));
+            try_new!(write!(f, "{}.{:06} seconds", sec, abs.tv_nsec() / 1_000));
         } else {
-            try!(write!(f, "{}.{:09} seconds", sec, abs.tv_nsec()));
+            try_new!(write!(f, "{}.{:09} seconds", sec, abs.tv_nsec()));
         }
 
         Ok(())
@@ -448,18 +448,18 @@ impl fmt::Display for TimeVal {
 
         let sec = abs.tv_sec();
 
-        try!(write!(f, "{}", sign));
+        try_new!(write!(f, "{}", sign));
 
         if abs.tv_usec() == 0 {
             if abs.tv_sec() == 1 {
-                try!(write!(f, "{} second", sec));
+                try_new!(write!(f, "{} second", sec));
             } else {
-                try!(write!(f, "{} seconds", sec));
+                try_new!(write!(f, "{} seconds", sec));
             }
         } else if abs.tv_usec() % 1000 == 0 {
-            try!(write!(f, "{}.{:03} seconds", sec, abs.tv_usec() / 1000));
+            try_new!(write!(f, "{}.{:03} seconds", sec, abs.tv_usec() / 1000));
         } else {
-            try!(write!(f, "{}.{:06} seconds", sec, abs.tv_usec()));
+            try_new!(write!(f, "{}.{:06} seconds", sec, abs.tv_usec()));
         }
 
         Ok(())

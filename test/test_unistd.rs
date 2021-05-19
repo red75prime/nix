@@ -11,7 +11,7 @@ use std::io::Write;
 use std::os::unix::prelude::*;
 use tempfile::tempfile;
 use tempdir::TempDir;
-use libc::{_exit, off_t};
+use ::libc::{_exit, off_t};
 
 #[test]
 fn test_fork_and_waitpid() {
