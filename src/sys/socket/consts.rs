@@ -343,7 +343,14 @@ mod test {
     }
 
     #[test]
+    #[allow(non_snake_case)]
     pub fn test_const_values() {
+        let MSG_OOB = MsgFlags::MSG_OOB.bits();
+        let MSG_PEEK = MsgFlags::MSG_PEEK.bits();
+        let MSG_DONTWAIT = MsgFlags::MSG_DONTWAIT.bits();
+        let MSG_EOR = MsgFlags::MSG_EOR.bits();
+        let MSG_TRUNC = MsgFlags::MSG_TRUNC.bits();
+        let MSG_CTRUNC = MsgFlags::MSG_CTRUNC.bits();
         check_const!(
             AF_UNIX,
             AF_LOCAL,
@@ -403,8 +410,10 @@ mod test {
 
     #[cfg(target_os = "linux")]
     #[test]
+    #[allow(non_snake_case)]
     pub fn test_general_linux_consts() {
         // TODO Figure out how to test new constants
+        let MSG_ERRQUEUE = MsgFlags::MSG_ERRQUEUE.bits();
         check_const!(
             SOL_IP,
             SOL_TCP,

@@ -1,4 +1,4 @@
-extern crate gcc;
+extern crate cc;
 
 use std::env;
 
@@ -13,7 +13,7 @@ pub fn main() {
         "UNKNOWN"
     };
 
-    gcc::Config::new()
+    cc::Build::new()
         .file("src/const.c")
         .file("src/sizes.c")
         .define(os, None)

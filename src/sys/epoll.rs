@@ -90,14 +90,13 @@ pub fn epoll_create1(flags: EpollCreateFlags) -> Result<RawFd> {
 }
 
 #[inline]
-pub fn epoll_ctl<'a, T>(epfd: RawFd, op: EpollOp, fd: RawFd, event: T) -> Result<()>
-    where T: Into<&'a mut EpollEvent>
+pub fn epoll_ctl(epfd: RawFd, op: EpollOp, fd: RawFd, event: Option<&mut EpollEvent>) -> Result<()>
 {
-    let event: &mut EpollEvent = event.into();
-    if event as *const EpollEvent == ptr::null() && op != EpollOp::EpollCtlDel {
+    let event_ptr = event.map(|r| &mut r.event as *mut libc::epoll_event).unwrap_or(ptr::null_mut());
+    if event_ptr == ptr::null_mut() && op != EpollOp::EpollCtlDel {
         Err(Error::Sys(Errno::EINVAL))
     } else {
-        let res = unsafe { libc::epoll_ctl(epfd, op as c_int, fd, &mut event.event) };
+        let res = unsafe { libc::epoll_ctl(epfd, op as c_int, fd, event_ptr) };
         Errno::result(res).map(drop)
     }
 }

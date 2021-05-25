@@ -4,7 +4,7 @@ use tempfile::tempfile;
 use nix::{Error, fcntl};
 use nix::errno::Errno;
 use nix::pty::openpty;
-use nix::sys::termios::{self, ECHO, OPOST, OCRNL, Termios, tcgetattr};
+use nix::sys::termios::{self, LocalFlags, OutputFlags, Termios, tcgetattr};
 use nix::unistd::{read, write, close};
 
 /// Helper function analogous to std::io::Write::write_all, but for `RawFd`s
@@ -20,7 +20,7 @@ fn write_all(f: RawFd, buf: &[u8]) {
 fn test_tcgetattr_pty() {
     // openpty uses ptname(3) internally
     #[allow(unused_variables)]
-    let m = ::PTSNAME_MTX.lock().expect("Mutex got poisoned by another test");
+    let m = crate::PTSNAME_MTX.lock().expect("Mutex got poisoned by another test");
 
     let pty = openpty(None, None).expect("openpty failed");
     assert!(termios::tcgetattr(pty.master).is_ok());
@@ -47,7 +47,7 @@ fn test_tcgetattr_ebadf() {
 fn test_output_flags() {
     // openpty uses ptname(3) internally
     #[allow(unused_variables)]
-    let m = ::PTSNAME_MTX.lock().expect("Mutex got poisoned by another test");
+    let m = crate::PTSNAME_MTX.lock().expect("Mutex got poisoned by another test");
 
     // Open one pty to get attributes for the second one
     let mut termios = {
@@ -61,11 +61,11 @@ fn test_output_flags() {
     };
 
     // Make sure postprocessing '\r' isn't specified by default or this test is useless.
-    assert!(!termios.output_flags.contains(OPOST | OCRNL));
+    assert!(!termios.output_flags.contains(OutputFlags::OPOST | OutputFlags::OCRNL));
 
     // Specify that '\r' characters should be transformed to '\n'
     // OPOST is specified to enable post-processing
-    termios.output_flags.insert(OPOST | OCRNL);
+    termios.output_flags.insert(OutputFlags::OPOST | OutputFlags::OCRNL);
 
     // Open a pty
     let pty = openpty(None, &termios).unwrap();
@@ -78,7 +78,7 @@ fn test_output_flags() {
 
     // Read from the slave verifying that the output has been properly transformed
     let mut buf = [0u8; 10];
-    ::read_exact(pty.slave, &mut buf);
+    crate::read_exact(pty.slave, &mut buf);
     let transformed_string = "foofoofoo\n";
     close(pty.master).unwrap();
     close(pty.slave).unwrap();
@@ -90,7 +90,7 @@ fn test_output_flags() {
 fn test_local_flags() {
     // openpty uses ptname(3) internally
     #[allow(unused_variables)]
-    let m = ::PTSNAME_MTX.lock().expect("Mutex got poisoned by another test");
+    let m = crate::PTSNAME_MTX.lock().expect("Mutex got poisoned by another test");
 
     // Open one pty to get attributes for the second one
     let mut termios = {
@@ -104,10 +104,10 @@ fn test_local_flags() {
     };
 
     // Make sure echo is specified by default or this test is useless.
-    assert!(termios.local_flags.contains(ECHO));
+    assert!(termios.local_flags.contains(LocalFlags::ECHO));
 
     // Disable local echo
-    termios.local_flags.remove(ECHO);
+    termios.local_flags.remove(LocalFlags::ECHO);
 
     // Open a new pty with our modified termios settings
     let pty = openpty(None, &termios).unwrap();
@@ -116,7 +116,7 @@ fn test_local_flags() {
 
     // Set the master is in nonblocking mode or reading will never return.
     let flags = fcntl::fcntl(pty.master, fcntl::F_GETFL).unwrap();
-    let new_flags = fcntl::OFlag::from_bits(flags).unwrap() | fcntl::O_NONBLOCK;
+    let new_flags = fcntl::OFlag::from_bits(flags).unwrap() | fcntl::OFlag::O_NONBLOCK;
     fcntl::fcntl(pty.master, fcntl::F_SETFL(new_flags)).unwrap();
 
     // Write into the master

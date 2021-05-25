@@ -13,7 +13,7 @@ use std::{thread, time};
 use tempfile::tempfile;
 
 // Helper that polls an AioCb for completion or error
-fn poll_aio(mut aiocb: &mut AioCb) -> Result<()> {
+fn poll_aio(aiocb: &mut AioCb) -> Result<()> {
     loop {
         let err = aiocb.error();
         if err != Err(Error::from(Errno::EINPROGRESS)) { return err; };
@@ -101,7 +101,7 @@ fn test_aio_suspend() {
 
     let mut wcb = AioCb::from_slice( f.as_raw_fd(),
                            2,   //offset
-                           &mut WBUF,
+                           WBUF,
                            0,   //priority
                            SigevNotify::SigevNone,
                            LioOpcode::LIO_WRITE);
@@ -244,9 +244,9 @@ extern fn sigfunc(_: c_int) {
 #[cfg_attr(any(all(target_env = "musl", target_arch = "x86_64"), target_arch = "mips"), ignore)]
 fn test_write_sigev_signal() {
     #[allow(unused_variables)]
-    let m = ::SIGNAL_MTX.lock().expect("Mutex got poisoned by another test");
+    let m = crate::SIGNAL_MTX.lock().expect("Mutex got poisoned by another test");
     let sa = SigAction::new(SigHandler::Handler(sigfunc),
-                            SA_RESETHAND,
+                            SaFlags::SA_RESETHAND,
                             SigSet::empty());
     SIGNALED.store(false, Ordering::Relaxed);
     unsafe { sigaction(Signal::SIGUSR2, &sa) }.unwrap();
@@ -375,7 +375,7 @@ fn test_lio_listio_nowait() {
 #[cfg_attr(any(target_arch = "mips", target_env = "musl"), ignore)]
 fn test_lio_listio_signal() {
     #[allow(unused_variables)]
-    let m = ::SIGNAL_MTX.lock().expect("Mutex got poisoned by another test");
+    let m = crate::SIGNAL_MTX.lock().expect("Mutex got poisoned by another test");
     const INITIAL: &'static [u8] = b"abcdef123456";
     const WBUF: &'static [u8] = b"CDEF";
     let rbuf = Rc::new(vec![0; 4].into_boxed_slice());
@@ -383,7 +383,7 @@ fn test_lio_listio_signal() {
     const EXPECT: &'static [u8] = b"abCDEF123456";
     let mut f = tempfile().unwrap();
     let sa = SigAction::new(SigHandler::Handler(sigfunc),
-                            SA_RESETHAND,
+                            SaFlags::SA_RESETHAND,
                             SigSet::empty());
     let sigev_notify = SigevNotify::SigevSignal { signal: Signal::SIGUSR2,
                                                   si_value: 0 };

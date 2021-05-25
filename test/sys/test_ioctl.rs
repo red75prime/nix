@@ -224,8 +224,8 @@ mod linux_ioctls {
     #[test]
     fn test_ioctl_bad_read() {
         let file = tempfile().unwrap();
-        let mut termios = unsafe { mem::uninitialized() };
-        let res = unsafe { tcgets(file.as_raw_fd(), &mut termios) };
+        let mut termios = mem::MaybeUninit::<termios>::uninit();
+        let res = unsafe { tcgets(file.as_raw_fd(), termios.as_mut_ptr()) };
         assert_eq!(res, Err(Sys(ENOTTY)));
     }
 
@@ -241,8 +241,8 @@ mod linux_ioctls {
     #[test]
     fn test_ioctl_bad_write_ptr() {
         let file = tempfile().unwrap();
-        let termios: termios = unsafe { mem::uninitialized() };
-        let res = unsafe { tcsets(file.as_raw_fd(), &termios) };
+        let termios = mem::MaybeUninit::<termios>::uninit();
+        let res = unsafe { tcsets(file.as_raw_fd(), termios.as_ptr()) };
         assert_eq!(res, Err(Sys(ENOTTY)));
     }
 
@@ -271,8 +271,8 @@ mod linux_ioctls {
     #[test]
     fn test_ioctl_read() {
         let file = tempfile().unwrap();
-        let data: v4l2_audio = unsafe { mem::uninitialized() };
-        let res = unsafe { g_audio(file.as_raw_fd(), &data) };
+        let data = mem::MaybeUninit::<v4l2_audio>::uninit();
+        let res = unsafe { g_audio(file.as_raw_fd(), data.as_ptr()) };
         assert!(res == Err(Sys(ENOTTY)) || res == Err(Sys(ENOSYS)));
     }
 
@@ -292,8 +292,8 @@ mod linux_ioctls {
     #[test]
     fn test_ioctl_write_ptr() {
         let file = tempfile().unwrap();
-        let mut data: v4l2_audio = unsafe { mem::uninitialized() };
-        let res = unsafe { g_audio(file.as_raw_fd(), &mut data) };
+        let mut data = mem::MaybeUninit::<v4l2_audio>::uninit();
+        let res = unsafe { g_audio(file.as_raw_fd(), data.as_mut_ptr()) };
         assert!(res == Err(Sys(ENOTTY)) || res == Err(Sys(ENOSYS)));
     }
 
@@ -302,8 +302,8 @@ mod linux_ioctls {
     #[test]
     fn test_ioctl_readwrite() {
         let file = tempfile().unwrap();
-        let mut data: v4l2_audio = unsafe { mem::uninitialized() };
-        let res = unsafe { enum_audio(file.as_raw_fd(), &mut data) };
+        let mut data = mem::MaybeUninit::<v4l2_audio>::uninit();
+        let res = unsafe { enum_audio(file.as_raw_fd(), data.as_mut_ptr()) };
         assert!(res == Err(Sys(ENOTTY)) || res == Err(Sys(ENOSYS)));
     }
 
@@ -328,8 +328,8 @@ mod linux_ioctls {
     #[test]
     fn test_ioctl_write_buf() {
         let file = tempfile().unwrap();
-        let mut data: [spi_ioc_transfer; 4] = unsafe { mem::uninitialized() };
-        let res = unsafe { spi_ioc_message(file.as_raw_fd(), &mut data[..]) };
+        let data = mem::MaybeUninit::<[spi_ioc_transfer; 4]>::zeroed();
+        let res = unsafe { spi_ioc_message(file.as_raw_fd(), &data.assume_init()) };
         assert!(res == Err(Sys(ENOTTY)) || res == Err(Sys(ENOSYS)));
     }
 

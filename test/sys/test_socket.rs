@@ -1,10 +1,10 @@
 use nix::sys::socket::{InetAddr, UnixAddr, getsockname};
-use std::mem;
+use std::mem::{self, MaybeUninit};
 use std::net::{self, Ipv6Addr, SocketAddr, SocketAddrV6};
 use std::path::Path;
 use std::str::FromStr;
 use std::os::unix::io::RawFd;
-use ::libc::c_char;
+use libc::c_char;
 
 #[test]
 pub fn test_inetv4_addr_to_sock_addr() {
@@ -98,8 +98,7 @@ pub fn test_scm_rights() {
     use nix::unistd::{pipe, read, write, close};
     use nix::sys::socket::{socketpair, sendmsg, recvmsg,
                            AddressFamily, SockType, SockFlag,
-                           ControlMessage, CmsgSpace, MsgFlags,
-                           MSG_TRUNC, MSG_CTRUNC};
+                           ControlMessage, CmsgSpace, MsgFlags};
 
     let (fd1, fd2) = socketpair(AddressFamily::Unix, SockType::Stream, 0,
                                 SockFlag::empty())
@@ -119,7 +118,7 @@ pub fn test_scm_rights() {
     {
         let mut buf = [0u8; 5];
         let iov = [IoVec::from_mut_slice(&mut buf[..])];
-        let mut cmsgspace: CmsgSpace<[RawFd; 1]> = CmsgSpace::new();
+        let mut cmsgspace: MaybeUninit<CmsgSpace<[RawFd; 1]>> = MaybeUninit::uninit();
         let msg = recvmsg(fd2, &iov, Some(&mut cmsgspace), MsgFlags::empty()).unwrap();
 
         for cmsg in msg.cmsgs() {
@@ -131,7 +130,7 @@ pub fn test_scm_rights() {
                 panic!("unexpected cmsg");
             }
         }
-        assert!(!msg.flags.intersects(MSG_TRUNC | MSG_CTRUNC));
+        assert!(!msg.flags.intersects(MsgFlags::MSG_TRUNC | MsgFlags::MSG_CTRUNC));
         close(fd2).unwrap();
     }
 
@@ -155,8 +154,7 @@ pub fn test_sendmsg_empty_cmsgs() {
     use nix::unistd::close;
     use nix::sys::socket::{socketpair, sendmsg, recvmsg,
                            AddressFamily, SockType, SockFlag,
-                           CmsgSpace, MsgFlags,
-                           MSG_TRUNC, MSG_CTRUNC};
+                           CmsgSpace, MsgFlags};
 
     let (fd1, fd2) = socketpair(AddressFamily::Unix, SockType::Stream, 0,
                                 SockFlag::empty())
@@ -171,13 +169,13 @@ pub fn test_sendmsg_empty_cmsgs() {
     {
         let mut buf = [0u8; 5];
         let iov = [IoVec::from_mut_slice(&mut buf[..])];
-        let mut cmsgspace: CmsgSpace<[RawFd; 1]> = CmsgSpace::new();
+        let mut cmsgspace = MaybeUninit::<CmsgSpace<[RawFd; 1]>>::uninit();
         let msg = recvmsg(fd2, &iov, Some(&mut cmsgspace), MsgFlags::empty()).unwrap();
 
         for _ in msg.cmsgs() {
             panic!("unexpected cmsg");
         }
-        assert!(!msg.flags.intersects(MSG_TRUNC | MSG_CTRUNC));
+        assert!(!msg.flags.intersects(MsgFlags::MSG_TRUNC | MsgFlags::MSG_CTRUNC));
         close(fd2).unwrap();
     }
 }

@@ -735,7 +735,7 @@ mod tests {
 
         let action_sig = SigAction::new(handler_sig, flags, mask);
 
-        assert_eq!(action_sig.flags(), SA_ONSTACK | SA_RESTART);
+        assert_eq!(action_sig.flags(), SaFlags::SA_ONSTACK | SaFlags::SA_RESTART);
         assert_eq!(action_sig.handler(), handler_sig);
 
         mask = action_sig.mask();

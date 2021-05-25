@@ -5,7 +5,7 @@ fn test_signalfd() {
 
     // Grab the mutex for altering signals so we don't interfere with other tests.
     #[allow(unused_variables)]
-    let m = ::SIGNAL_MTX.lock().expect("Mutex got poisoned by another test");
+    let m = crate::SIGNAL_MTX.lock().expect("Mutex got poisoned by another test");
 
     // Block the SIGUSR1 signal from automatic processing for this thread
     let mut mask = SigSet::empty();

@@ -12,11 +12,11 @@ pub struct UContext {
 impl UContext {
     #[cfg(not(target_env = "musl"))]
     pub fn get() -> Result<UContext> {
-        let mut context: libc::ucontext_t = unsafe { mem::uninitialized() };
-        let res = unsafe {
-            libc::getcontext(&mut context as *mut libc::ucontext_t)
-        };
-        Errno::result(res).map(|_| UContext { context: context })
+        let mut context = std::mem::MaybeUninit::<libc::ucontext_t>::uninit();
+        unsafe {
+            let res = libc::getcontext(context.as_mut_ptr());
+            Errno::result(res).map(|_| UContext { context: context.assume_init() })
+        }
     }
 
     #[cfg(not(target_env = "musl"))]

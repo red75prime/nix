@@ -157,14 +157,14 @@ mod tests {
     #[test]
     fn create_signalfd_with_opts() {
         let mask = SigSet::empty();
-        let fd = SignalFd::with_flags(&mask, SFD_CLOEXEC | SFD_NONBLOCK);
+        let fd = SignalFd::with_flags(&mask, SfdFlags::SFD_CLOEXEC | SfdFlags::SFD_NONBLOCK);
         assert!(fd.is_ok());
     }
 
     #[test]
     fn read_empty_signalfd() {
         let mask = SigSet::empty();
-        let mut fd = SignalFd::with_flags(&mask, SFD_NONBLOCK).unwrap();
+        let mut fd = SignalFd::with_flags(&mask, SfdFlags::SFD_NONBLOCK).unwrap();
 
         let res = fd.read_signal();
         assert!(res.unwrap().is_none());

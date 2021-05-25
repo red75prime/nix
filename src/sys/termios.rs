@@ -123,22 +123,22 @@ impl Termios {
         self.inner.as_ptr()
     }
 
-    // /// Allows for easily creating new Termios structs that will be overwritten with real data.
-    // ///
-    // /// This should only be used when the inner libc::termios struct will be overwritten before it's
-    // /// read.
-    // // FIXME: Switch this over to use pub(crate)
-    // #[doc(hidden)]
-    // pub unsafe fn default_uninit() -> Self {
-    //     Termios {
-    //         inner: RefCell::new(mem::uninitialized()),
-    //         input_flags: InputFlags::empty(),
-    //         output_flags: OutputFlags::empty(),
-    //         control_flags: ControlFlags::empty(),
-    //         local_flags: LocalFlags::empty(),
-    //         control_chars: [0 as libc::cc_t; NCCS],
-    //     }
-    // }
+    /// Allows for easily creating new Termios structs that will be overwritten with real data.
+    ///
+    /// This should only be used when the inner libc::termios struct will be overwritten before it's
+    /// read.
+    // FIXME: Switch this over to use pub(crate)
+    #[doc(hidden)]
+    pub unsafe fn default_uninit() -> Self {
+        Termios {
+            inner: RefCell::new(mem::MaybeUninit::zeroed().assume_init()),
+            input_flags: InputFlags::empty(),
+            output_flags: OutputFlags::empty(),
+            control_flags: ControlFlags::empty(),
+            local_flags: LocalFlags::empty(),
+            control_chars: [0 as libc::cc_t; NCCS],
+        }
+    }
 
     /// Updates the wrapper values from the internal `libc::termios` data structure.
     #[doc(hidden)]

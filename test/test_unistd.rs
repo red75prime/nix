@@ -16,7 +16,7 @@ use ::libc::{_exit, off_t};
 #[test]
 fn test_fork_and_waitpid() {
     #[allow(unused_variables)]
-    let m = ::FORK_MTX.lock().expect("Mutex got poisoned by another test");
+    let m = crate::FORK_MTX.lock().expect("Mutex got poisoned by another test");
 
     // Safe: Child only calls `_exit`, which is signal-safe
     match fork() {
@@ -47,7 +47,7 @@ fn test_fork_and_waitpid() {
 fn test_wait() {
     // Grab FORK_MTX so wait doesn't reap a different test's child process
     #[allow(unused_variables)]
-    let m = ::FORK_MTX.lock().expect("Mutex got poisoned by another test");
+    let m = crate::FORK_MTX.lock().expect("Mutex got poisoned by another test");
 
     // Safe: Child only calls `_exit`, which is signal-safe
     let pid = fork();
@@ -109,7 +109,7 @@ macro_rules! execve_test_factory(
     #[test]
     fn $test_name() {
         #[allow(unused_variables)]
-        let m = ::FORK_MTX.lock().expect("Mutex got poisoned by another test");
+        let m = crate::FORK_MTX.lock().expect("Mutex got poisoned by another test");
         // The `exec`d process will write to `writer`, and we'll read that
         // data from `reader`.
         let (reader, writer) = pipe().unwrap();
@@ -160,7 +160,7 @@ macro_rules! execve_test_factory(
 fn test_fchdir() {
     // fchdir changes the process's cwd
     #[allow(unused_variables)]
-    let m = ::CWD_MTX.lock().expect("Mutex got poisoned by another test");
+    let m = crate::CWD_MTX.lock().expect("Mutex got poisoned by another test");
 
     let tmpdir = TempDir::new("test_fchdir").unwrap();
     let tmpdir_path = tmpdir.path().canonicalize().unwrap();
@@ -176,7 +176,7 @@ fn test_fchdir() {
 fn test_getcwd() {
     // chdir changes the process's cwd
     #[allow(unused_variables)]
-    let m = ::CWD_MTX.lock().expect("Mutex got poisoned by another test");
+    let m = crate::CWD_MTX.lock().expect("Mutex got poisoned by another test");
 
     let tmpdir = TempDir::new("test_getcwd").unwrap();
     let tmpdir_path = tmpdir.path().canonicalize().unwrap();
@@ -191,7 +191,7 @@ fn test_getcwd() {
     for _ in 0..5 {
         let newdir = iter::repeat("a").take(100).collect::<String>();
         inner_tmp_dir.push(newdir);
-        assert!(mkdir(inner_tmp_dir.as_path(), stat::S_IRWXU).is_ok());
+        assert!(mkdir(inner_tmp_dir.as_path(), stat::Mode::S_IRWXU).is_ok());
     }
     assert!(chdir(inner_tmp_dir.as_path()).is_ok());
     assert_eq!(getcwd().unwrap(), inner_tmp_dir.as_path());
@@ -208,7 +208,7 @@ fn test_lseek() {
     lseek(tmpfd, offset, Whence::SeekSet).unwrap();
 
     let mut buf = [0u8; 7];
-    ::read_exact(tmpfd, &mut buf);
+    crate::read_exact(tmpfd, &mut buf);
     assert_eq!(b"f123456", &buf);
 
     close(tmpfd).unwrap();
@@ -225,7 +225,7 @@ fn test_lseek64() {
     lseek64(tmpfd, 5, Whence::SeekSet).unwrap();
 
     let mut buf = [0u8; 7];
-    ::read_exact(tmpfd, &mut buf);
+    crate::read_exact(tmpfd, &mut buf);
     assert_eq!(b"f123456", &buf);
 
     close(tmpfd).unwrap();

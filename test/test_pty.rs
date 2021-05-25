@@ -3,7 +3,7 @@ use std::path::Path;
 use std::os::unix::prelude::*;
 use tempfile::tempfile;
 
-use nix::fcntl::{O_RDWR, open};
+use nix::fcntl::{OFlag, open};
 use nix::pty::*;
 use nix::sys::stat;
 use nix::sys::termios::*;
@@ -14,7 +14,7 @@ use nix::unistd::{write, close};
 #[test]
 fn test_explicit_close() {
     let mut f = {
-        let m = posix_openpt(O_RDWR).unwrap();
+        let m = posix_openpt(OFlag::O_RDWR).unwrap();
         close(m.into_raw_fd()).unwrap();
         tempfile().unwrap()
     };
@@ -28,10 +28,10 @@ fn test_explicit_close() {
 #[cfg(any(target_os = "android", target_os = "linux"))]
 fn test_ptsname_equivalence() {
     #[allow(unused_variables)]
-    let m = ::PTSNAME_MTX.lock().expect("Mutex got poisoned by another test");
+    let m = crate::PTSNAME_MTX.lock().expect("Mutex got poisoned by another test");
 
     // Open a new PTTY master
-    let master_fd = posix_openpt(O_RDWR).unwrap();
+    let master_fd = posix_openpt(OFlag::O_RDWR).unwrap();
     assert!(master_fd.as_raw_fd() > 0);
 
     // Get the name of the slave
@@ -46,10 +46,10 @@ fn test_ptsname_equivalence() {
 #[cfg(any(target_os = "android", target_os = "linux"))]
 fn test_ptsname_copy() {
     #[allow(unused_variables)]
-    let m = ::PTSNAME_MTX.lock().expect("Mutex got poisoned by another test");
+    let m = crate::PTSNAME_MTX.lock().expect("Mutex got poisoned by another test");
 
     // Open a new PTTY master
-    let master_fd = posix_openpt(O_RDWR).unwrap();
+    let master_fd = posix_openpt(OFlag::O_RDWR).unwrap();
     assert!(master_fd.as_raw_fd() > 0);
 
     // Get the name of the slave
@@ -66,7 +66,7 @@ fn test_ptsname_copy() {
 #[cfg(any(target_os = "android", target_os = "linux"))]
 fn test_ptsname_r_copy() {
     // Open a new PTTY master
-    let master_fd = posix_openpt(O_RDWR).unwrap();
+    let master_fd = posix_openpt(OFlag::O_RDWR).unwrap();
     assert!(master_fd.as_raw_fd() > 0);
 
     // Get the name of the slave
@@ -81,14 +81,14 @@ fn test_ptsname_r_copy() {
 #[cfg(any(target_os = "android", target_os = "linux"))]
 fn test_ptsname_unique() {
     #[allow(unused_variables)]
-    let m = ::PTSNAME_MTX.lock().expect("Mutex got poisoned by another test");
+    let m = crate::PTSNAME_MTX.lock().expect("Mutex got poisoned by another test");
 
     // Open a new PTTY master
-    let master1_fd = posix_openpt(O_RDWR).unwrap();
+    let master1_fd = posix_openpt(OFlag::O_RDWR).unwrap();
     assert!(master1_fd.as_raw_fd() > 0);
 
     // Open a second PTTY master
-    let master2_fd = posix_openpt(O_RDWR).unwrap();
+    let master2_fd = posix_openpt(OFlag::O_RDWR).unwrap();
     assert!(master2_fd.as_raw_fd() > 0);
 
     // Get the name of the slave
@@ -105,10 +105,10 @@ fn test_ptsname_unique() {
 #[test]
 fn test_open_ptty_pair() {
     #[allow(unused_variables)]
-    let m = ::PTSNAME_MTX.lock().expect("Mutex got poisoned by another test");
+    let m = crate::PTSNAME_MTX.lock().expect("Mutex got poisoned by another test");
 
     // Open a new PTTY master
-    let master_fd = posix_openpt(O_RDWR).expect("posix_openpt failed");
+    let master_fd = posix_openpt(OFlag::O_RDWR).expect("posix_openpt failed");
     assert!(master_fd.as_raw_fd() > 0);
 
     // Allow a slave to be generated for it
@@ -119,7 +119,7 @@ fn test_open_ptty_pair() {
     let slave_name = ptsname(&master_fd).expect("ptsname failed");
 
     // Open the slave device
-    let slave_fd = open(Path::new(&slave_name), O_RDWR, stat::Mode::empty()).unwrap();
+    let slave_fd = open(Path::new(&slave_name), OFlag::O_RDWR, stat::Mode::empty()).unwrap();
     assert!(slave_fd > 0);
 }
 
@@ -127,7 +127,7 @@ fn test_open_ptty_pair() {
 fn test_openpty() {
     // openpty uses ptname(3) internally
     #[allow(unused_variables)]
-    let m = ::PTSNAME_MTX.lock().expect("Mutex got poisoned by another test");
+    let m = crate::PTSNAME_MTX.lock().expect("Mutex got poisoned by another test");
 
     let pty = openpty(None, None).unwrap();
     assert!(pty.master > 0);
@@ -137,21 +137,21 @@ fn test_openpty() {
     let string = "foofoofoo\n";
     let mut buf = [0u8; 10];
     write(pty.master, string.as_bytes()).unwrap();
-    ::read_exact(pty.slave, &mut buf);
+    crate::read_exact(pty.slave, &mut buf);
 
     assert_eq!(&buf, string.as_bytes());
 
     // Read the echo as well
     let echoed_string = "foofoofoo\r\n";
     let mut buf = [0u8; 11];
-    ::read_exact(pty.master, &mut buf);
+    crate::read_exact(pty.master, &mut buf);
     assert_eq!(&buf, echoed_string.as_bytes());
 
     let string2 = "barbarbarbar\n";
     let echoed_string2 = "barbarbarbar\r\n";
     let mut buf = [0u8; 14];
     write(pty.slave, string2.as_bytes()).unwrap();
-    ::read_exact(pty.master, &mut buf);
+    crate::read_exact(pty.master, &mut buf);
 
     assert_eq!(&buf, echoed_string2.as_bytes());
 
@@ -163,7 +163,7 @@ fn test_openpty() {
 fn test_openpty_with_termios() {
     // openpty uses ptname(3) internally
     #[allow(unused_variables)]
-    let m = ::PTSNAME_MTX.lock().expect("Mutex got poisoned by another test");
+    let m = crate::PTSNAME_MTX.lock().expect("Mutex got poisoned by another test");
 
     // Open one pty to get attributes for the second one
     let mut termios = {
@@ -176,7 +176,7 @@ fn test_openpty_with_termios() {
         termios
     };
     // Make sure newlines are not transformed so the data is preserved when sent.
-    termios.output_flags.remove(ONLCR);
+    termios.output_flags.remove(OutputFlags::ONLCR);
 
     let pty = openpty(None, &termios).unwrap();
     // Must be valid file descriptors
@@ -187,20 +187,20 @@ fn test_openpty_with_termios() {
     let string = "foofoofoo\n";
     let mut buf = [0u8; 10];
     write(pty.master, string.as_bytes()).unwrap();
-    ::read_exact(pty.slave, &mut buf);
+    crate::read_exact(pty.slave, &mut buf);
 
     assert_eq!(&buf, string.as_bytes());
 
     // read the echo as well
     let echoed_string = "foofoofoo\n";
-    ::read_exact(pty.master, &mut buf);
+    crate::read_exact(pty.master, &mut buf);
     assert_eq!(&buf, echoed_string.as_bytes());
 
     let string2 = "barbarbarbar\n";
     let echoed_string2 = "barbarbarbar\n";
     let mut buf = [0u8; 13];
     write(pty.slave, string2.as_bytes()).unwrap();
-    ::read_exact(pty.master, &mut buf);
+    crate::read_exact(pty.master, &mut buf);
 
     assert_eq!(&buf, echoed_string2.as_bytes());
 
